@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int       @id @default(autoincrement())
+  uid        String    @unique @default(cuid())
+  login      String    @unique
+  email      String?   @unique // Hacer el campo email opcional
+  idExternal String?   @unique @map("id_external")
+  nicename   String
+  password   String
+  type       String    @default("User")
+  status     String    @default("Active")
+  language   String    @default("en")
+  wallet     String    @default("0x")
+  metas      Json?     @default("{}")
+  createdAt  DateTime  @default(now()) @map("created")
+  modifiedAt DateTime  @default(now()) @map("modified")
+  messages   Message[]
+
+  @@map("user")
+}
+
+model Message {
+  id            Int       @id @default(autoincrement())
+  content       String    @db.LongText // Para soportar mensajes aún más largos
+  createdAt     DateTime  @default(now()) @map("created_at")
+  messageType   String // USER o ASSISTANT
+  userId        Int
+  responseTo    Int?      @map("response_to")
+  user          User      @relation(fields: [userId], references: [id])
+  parentMessage Message?  @relation("responses", fields: [responseTo], references: [id])
+  responses     Message[] @relation("responses")
+
+  @@map("message")
+}
+
+model Chat {
+  id       Int       @id @default(autoincrement())
+  uid      String    @unique @default(cuid())
+  userId   Int
+  system   String    @db.LongText // Para soportar mensajes aún más largos
+  user     User      @relation(fields: [userId], references: [id])
+  messages Message[] // Relación con mensajes para almacenar las instancias de conversaciones
+
+  @@map("chat")
+}
+
+model Attachment {
+  id         Int      @id @default(autoincrement())
+  slug       String   @unique
+  name       String   @default("")
+  attachment String   @default("")
+  mime       String   @default("")
+  size       Int      @default(0)
+  source     String   @default("")
+  acl        String   @default("")
+  metas      Json?    @default("{}")
+  createdAt  DateTime @default(now()) @map("created")
+  modifiedAt DateTime @default(now()) @map("modified")
+
+  @@map("attachment")
+}
+
+model Log {
+  id          Int      @id @default(autoincrement())
+  uid         String   @unique @default(cuid())
+  userId      Int?     @default(0) @map("id_user")
+  type        String?  @default("Log Event")
+  action      String?
+  description String?
+  metas       Json?    @default("{}")
+  createdAt   DateTime @default(now()) @map("created")
+  modifiedAt  DateTime @default(now()) @map("modified")
+
+  @@map("log")
+}

@@ -6,14 +6,11 @@ import { getRouter } from '@thewebchimp/primate';
 const openaiAPIKey = process.env.OPENAI_API_KEY;
 const perplexityAPIKey = process.env.PERPLEXITY_API_KEY;
 const groqAPIKey = process.env.GROQ_API_KEY;
+const openRouterApiKey = process.env.OPEN_ROUTER_KEY;
 
 class AIController {
     static async sendMessage(req, res) {
 		let { model, system, prompt, stream, history, mode } = req.body;
-
-        /*
-          Everything can have default values except prompt
-         */
 
         if(typeof stream === 'undefined') stream = true;
         if(typeof history === 'undefined') history = [];
@@ -77,6 +74,10 @@ class AIController {
             'dolphincoder',
         ]
 
+		const openRouterModels = [
+			'cognitivecomputations/dolphin-mixtral-8x7b',
+			'burrito-8x7b',
+		]
 
 		if(groqModels.includes(model)) {
 			if(model === 'llama2-70b-4096' && maxTokens > 4096) maxTokens = 4096 - 2500;
@@ -111,8 +112,14 @@ class AIController {
         if(ollamaModels.includes(model)) {
             if(model === 'dolphincoder' && maxTokens > 4096) maxTokens = 1024;
         }
+		if(openRouterModels.includes(model)) {
+			if(model === 'burrito-8x7b' && maxTokens > 16384) maxTokens = 16384;
+		}
 		// check that model is in openAIModels or perplexityModels
-		if(!openAIModels.includes(model) && !perplexityModels.includes(model) && !groqModels.includes(model) && !ollamaModels.includes(model)) {
+		if(!openAIModels.includes(model) && !perplexityModels.includes(model)
+			&& !groqModels.includes(model) && !ollamaModels.includes(model)
+			&& !openRouterModels.includes(model)
+		) {
 			res.respond({
 				status: 400,
 				message: 'Model not supported',
@@ -135,6 +142,7 @@ class AIController {
 		if(perplexityModels.includes(model)) provider = 'perplexity';
 		if(groqModels.includes(model)) provider = 'groq';
         if(ollamaModels.includes(model)) provider = 'ollama';
+		if(openRouterModels.includes(model)) provider = 'openrouter';
 
 		try {
 			let response;
@@ -195,7 +203,7 @@ class AIController {
 			if(provider === 'openai' && model === 'gpt-4-1106-preview' && mode === 'json') {
 				body.response_format = { "type": "json_object" };
 			}
-			console.log("Data debug: ")
+			console.log("Data debug asgfasdfa: ")
 			console.log(`
 				{
 				
@@ -220,8 +228,9 @@ class AIController {
 					stream: ${stream},
 					
 				}
-		
 			`)
+
+			console.log("Provider: ", provider)
 			if(provider === 'openai') {
 
 				if(model === 'ag1') model = 'gpt-3.5-turbo-16k';
@@ -332,34 +341,38 @@ class AIController {
 				response.data.pipe(res);
 			}
 
-            if(provider === 'ollama') {
-                console.log("OLLAMA _ BASE URL: ", process.env.OLLAMA_BASE_URL)
-                // Configurar la solicitud para streaming
-                response = await axios.post(`${process.env.OLLAMA_BASE_URL}/api/generate`, {
-                    model,
-                    messages: [
-                        { 'role': 'system', 'content': system || 'You are a helpful assistant.' },
-                        ...history,
-                    ],
-                    temperature: temperature,
-                    max_tokens: maxTokens,
-                    top_p: topP,
-                    frequency_penalty: frequencyPenalty,
-                    presence_penalty: presencePenalty,
-                    stream,
-                    prompt,
-                }, {
-                    headers: {
-                        Accept: 'application/json',
-                        'Content-Type': 'application/json',
-                    },
-                    responseType: 'stream',
-                });
+			if(provider === 'openrouter') {
+				console.log("[----------OpenRouter----------]")
+				if(model === 'burrito-8x7b') model = 'cognitivecomputations/dolphin-mixtral-8x7b';
+				// Configurar la solicitud para streaming
+				response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+					model,
+					messages: [
+						{ 'role': 'system', 'content': system || 'You are a helpful assistant.' },
+						...history,
+						{
+							'role': 'user',
+							'content': prompt || 'Hello',
+						},
+					],
+					temperature: temperature,
+					max_tokens: maxTokens,
+					top_p: topP,
+					frequency_penalty: frequencyPenalty,
+					presence_penalty: presencePenalty,
+					stream,
+				}, {
+					headers: {
+						Accept: 'application/json',
+						'Content-Type': 'application/json',
+						Authorization: `Bearer ${ openRouterApiKey }`,
+					},
+					responseType: 'stream',
+				});
 
-                res.writeHead(response.status, response.headers);
-                response.data.pipe(res);
-            }
-
+				res.writeHead(response.status, response.headers);
+				response.data.pipe(res);
+			}
 
 		} catch(error) {
 
