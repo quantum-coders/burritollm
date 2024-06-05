@@ -7,15 +7,11 @@ const options = {
 	queryableFields: [ 'nicename', 'email' ],
 };
 
-router.post('/register', UserController.register);
-router.post('/login', UserController.login);
+router.post('/authenticate', UserController.authenticate);
 router.get('/me', auth, UserController.me);
-router.get('/google/redirect', UserController.googleRedirect);
-router.post('/google/authenticate', UserController.googleAuth);
-
-router.post('/me/chats', auth, UserController.chat);
 
 /*
+router.post('/me/chats', auth, UserController.chat);
 router.get('/me/chats', auth, UserController.chats);
 router.get('/me/chats/:id', auth, UserController.chat);
 router.get('/me/chats/:id/messages', auth, UserController.chatMessages);

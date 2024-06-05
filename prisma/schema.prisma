@@ -34,7 +34,7 @@ model Message {
   idChat      Int?     @map("id_chat")
   content     String   @db.LongText
   createdAt   DateTime @default(now()) @map("created_at")
-  messageType String // USER o ASSISTANT
+  messageType String   @default("user") @map("message_type")
   idUser      Int
   responseTo  Int?     @map("response_to")
   created     DateTime @default(now()) @map("created")
@@ -50,7 +50,7 @@ model Message {
 
 model Chat {
   id       Int      @id @default(autoincrement())
-  idUser   Int
+  idUser   Int      @map("id_user")
   uid      String   @unique @default(cuid())
   system   String   @db.LongText
   user     User     @relation(fields: [idUser], references: [id])
