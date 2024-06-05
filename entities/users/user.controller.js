@@ -44,7 +44,7 @@ class UserController extends PrimateController {
 			console.log(e);
 
 			return res.respond({
-				status: 500,
+				status: 400,
 				message: 'Error creating user: ' + e.message,
 			});
 		}
