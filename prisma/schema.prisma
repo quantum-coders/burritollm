@@ -30,15 +30,14 @@ model User {
 }
 
 model Message {
-  id          Int      @id @default(autoincrement())
-  idChat      Int?     @map("id_chat")
-  content     String   @db.LongText
-  createdAt   DateTime @default(now()) @map("created_at")
-  messageType String   @default("user") @map("message_type")
-  idUser      Int
-  responseTo  Int?     @map("response_to")
-  created     DateTime @default(now()) @map("created")
-  modified    DateTime @default(now()) @map("modified")
+  id         Int      @id @default(autoincrement())
+  idChat     Int      @map("id_chat")
+  idUser     Int      @map("id_user")
+  content    String   @db.LongText
+  type       String   @default("user") @map("message_type")
+  responseTo Int?     @map("response_to")
+  created    DateTime @default(now()) @map("created")
+  modified   DateTime @default(now()) @map("modified")
 
   responses     Message[] @relation("responses")
   parentMessage Message?  @relation("responses", fields: [responseTo], references: [id])

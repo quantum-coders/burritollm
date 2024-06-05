@@ -37,7 +37,7 @@ class UserController extends PrimateController {
 			return res.respond({
 				data: user,
 				props: { token },
-				message
+				message,
 			});
 		} catch(e) {
 
@@ -70,6 +70,86 @@ class UserController extends PrimateController {
 			next(createError(404, e.message));
 		}
 	};
+
+	static async createChat(req, res, next) {
+		try {
+
+			const idUser = req.user.payload.id;
+
+			const data = await UserService.createChat(idUser);
+
+			return res.respond({
+				data,
+				message: 'Chat created successfully',
+			});
+
+		} catch(e) {
+			next(createError(404, e.message));
+		}
+	}
+
+	static async createChatMessage(req, res, next) {
+		try {
+			const { uid } = req.params;
+			const idUser = req.user.payload.id;
+			const { message } = req.body;
+
+			console.log(uid, idUser, message);
+
+			const chat = await PrimateService.findBy({ idUser, uid }, 'chat');
+			console.log(chat);
+
+			if(!chat) {
+				return res.respond({
+					status: 404,
+					message: 'Chat not found',
+				});
+			}
+
+			const data = {
+				idChat: chat.id,
+				idUser,
+				content: message,
+			};
+
+			const chatMessage = await PrimateService.create(data, 'message');
+
+			return res.respond({
+				data: chatMessage,
+				message: 'Chat message created successfully',
+			});
+
+		} catch(e) {
+			next(createError(404, e.message));
+		}
+	}
+
+	static async getChat(req, res, next) {
+		try {
+			const { uid } = req.params;
+			const idUser = req.user.payload.id;
+
+			const chat = await PrimateService.findBy({
+				idUser: idUser,
+				uid: uid,
+			}, 'chat', { include: { messages: true } });
+
+			if(!chat) {
+				return res.respond({
+					status: 404,
+					message: 'Chat not found',
+				});
+			}
+
+			return res.respond({
+				data: chat,
+				message: 'Chat found',
+			});
+
+		} catch(e) {
+			next(createError(404, e.message));
+		}
+	}
 
 }
 

@@ -10,12 +10,13 @@ const options = {
 router.post('/authenticate', UserController.authenticate);
 router.get('/me', auth, UserController.me);
 
+router.post('/me/chats', auth, UserController.createChat);
+router.get('/me/chats/:uid', auth, UserController.getChat);
+router.post('/me/chats/:uid/messages', auth, UserController.createChatMessage);
+
 /*
-router.post('/me/chats', auth, UserController.chat);
 router.get('/me/chats', auth, UserController.chats);
-router.get('/me/chats/:id', auth, UserController.chat);
-router.get('/me/chats/:id/messages', auth, UserController.chatMessages);
-router.post('/me/chats/:id/messages', auth, UserController.chatMessage);
+router.get('/me/chats/:uid/messages', auth, UserController.chatMessages);
 */
 
 setupRoute('user', router, options);

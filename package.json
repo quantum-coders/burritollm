@@ -10,7 +10,7 @@
 	},
 	"dependencies": {
 		"@faker-js/faker": "^8.4.1",
-		"@thewebchimp/primate": "^1.1.11-entities",
+		"@thewebchimp/primate": "^1.1.15-entities",
 		"aws-sdk": "^2.1613.0",
 		"axios": "^1.6.7",
 		"bcrypt": "^5.1.1",

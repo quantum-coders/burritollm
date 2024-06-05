@@ -100,10 +100,10 @@
     unbzip2-stream "1.4.3"
     yargs "17.7.2"
 
-"@thewebchimp/primate@^1.1.11-entities":
-  version "1.1.11-entities"
-  resolved "https://registry.yarnpkg.com/@thewebchimp/primate/-/primate-1.1.11-entities.tgz#84a71b48b97db58eb86d6a8b8bca02d09ed4767c"
-  integrity sha512-IE3CelusbDOl0dUBL9iKBZRlB5dGO2TBr+9OStWql2OrLV3TNHZLOuiihRl8hMDcrtOSAp8uhSXg6zw4cfUviw==
+"@thewebchimp/primate@^1.1.15-entities":
+  version "1.1.15-entities"
+  resolved "https://registry.yarnpkg.com/@thewebchimp/primate/-/primate-1.1.15-entities.tgz#985d343518ebce4c4fc86957341c83fa6e559ec9"
+  integrity sha512-8TtkmkuJHGb+B2YiiQSbtB3iXjx0TvuoeQksP/2N4OpSL1Bfrb42Ry1mQPghESFXkFoQtfrYzPKERIE4wy4y2A==
   dependencies:
     "@prisma/client" "^5.7.1"
     body-parser "^1.20.2"
