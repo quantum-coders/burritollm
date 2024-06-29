@@ -93,6 +93,7 @@ class UserController extends PrimateController {
 			const { uid } = req.params;
 			const idUser = req.user.payload.id;
 			const { message } = req.body;
+			const {type} = req.body
 
 			console.log(uid, idUser, message);
 
@@ -111,6 +112,10 @@ class UserController extends PrimateController {
 				idUser,
 				content: message,
 			};
+
+			if(type){
+				data.type = type
+			}
 
 			const chatMessage = await PrimateService.create(data, 'message');
 

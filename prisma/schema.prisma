@@ -48,15 +48,18 @@ model Message {
 }
 
 model Chat {
-  id       Int      @id @default(autoincrement())
-  idUser   Int      @map("id_user")
-  uid      String   @unique @default(cuid())
-  system   String   @db.LongText
-  user     User     @relation(fields: [idUser], references: [id])
-  created  DateTime @default(now()) @map("created")
-  modified DateTime @default(now()) @map("modified")
-
-  messages Message[]
+  id          Int       @id @default(autoincrement())
+  uid         String    @unique @default(cuid())
+  name        String    @default("New Chat")
+  description String?   @db.Text
+  idUser      Int       @map("id_user")
+  system      String    @db.LongText
+  status      String    @default("active")
+  user        User      @relation(fields: [idUser], references: [id])
+  created     DateTime  @default(now()) @map("created")
+  modified    DateTime  @default(now()) @map("modified")
+  messages    Message[]
+  metas       Json?     @default("{}")
 
   @@map("chat")
 }
