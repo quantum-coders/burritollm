@@ -2,159 +2,221 @@ import createError from 'http-errors';
 import queryString from 'query-string';
 import axios from 'axios';
 import UserService from './user.service.js';
-import { jwt, PrimateController, PrimateService } from '@thewebchimp/primate';
+import {jwt, PrimateController, PrimateService} from '@thewebchimp/primate';
 
 class UserController extends PrimateController {
-	static async authenticate(req, res, next) {
-		try {
-			const { wallet } = req.body;
-			let message = 'User authenticated successfully';
 
-			// check for valid wallet address with regex
-			if(!wallet || !/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
-				return res.respond({
-					status: 400,
-					message: 'Error: Invalid wallet address',
-				});
-			}
+    static async getChats(req, res, next) {
+        try {
+            const idUser = req.user.payload.id;
 
-			let user = await UserService.findByWallet(wallet);
+            const chats = await PrimateService.findBy(
+                {idUser},
+                'chat',
+                {
+                    select: {
+                        id: true,
+                        name: true,
+                        uid: true,
+                        description: true,
+                        idUser: true,
+                        system: true,
+                        status: true,
+                        created: true,
+                        user: {
+                            select: {
+                                wallet: true
+                            }
+                        },
+                        messages: {
+                            orderBy: {
+                                modified: 'desc'
+                            },
+                            take: 1,
+                            select: {
+                                modified: true
+                            }
+                        },
+                        _count: {
+                            select: {
+                                messages: true
+                            }
+                        }
+                    }
+                }
+            )
+            console.log(chats)
+            // if there is only one chat it is an object so convert to array
+            const chatsArray = Array.isArray(chats) ? chats : [chats];
+            const formattedChats = chatsArray.map(chat => ({
+                ...chat,
+                userName: chat.user.name,
+                modified: chat.messages[0]?.modified || chat.modified,
+                user: undefined,
+                messages: undefined,
+                wallet: chat.user.wallet,
+            }));
 
-			if(!user) {
-				user = await UserService.create({
-					wallet,
-					login: wallet,
-					type: 'User',
-					status: 'Active',
-				});
+            return res.respond({
+                data: formattedChats,
+                message: 'Chats found',
+            });
 
-				message = 'User created successfully';
-			}
+        } catch (e) {
+            next(createError(404, e.message));
+        }
+    }
 
-			// Firmar un JWT para el usuario
-			const token = await jwt.signAccessToken(user);
+    static async authenticate(req, res, next) {
+        try {
+            const {wallet} = req.body;
+            let message = 'User authenticated successfully';
 
-			return res.respond({
-				data: user,
-				props: { token },
-				message,
-			});
-		} catch(e) {
+            // check for valid wallet address with regex
+            if (!wallet || !/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
+                return res.respond({
+                    status: 400,
+                    message: 'Error: Invalid wallet address',
+                });
+            }
 
-			console.log(e);
+            let user = await UserService.findByWallet(wallet);
 
-			return res.respond({
-				status: 400,
-				message: 'Error creating user: ' + e.message,
-			});
-		}
-	};
+            if (!user) {
+                user = await UserService.create({
+                    wallet,
+                    login: wallet,
+                    type: 'User',
+                    status: 'Active',
+                });
 
-	static async me(req, res, next) {
-		try {
-			// Get user from req
-			const signedUser = req.user.payload;
-			const user = await UserService.findById(signedUser.id);
+                message = 'User created successfully';
+            }
 
-			if(user) {
+            // Firmar un JWT para el usuario
+            const token = await jwt.signAccessToken(user);
 
-				// delete password
-				delete user.password;
+            return res.respond({
+                data: user,
+                props: {token},
+                message,
+            });
+        } catch (e) {
 
-				res.respond({
-					data: user,
-					message: 'User found',
-				});
-			}
-		} catch(e) {
-			next(createError(404, e.message));
-		}
-	};
+            console.log(e);
 
-	static async createChat(req, res, next) {
-		try {
+            return res.respond({
+                status: 400,
+                message: 'Error creating user: ' + e.message,
+            });
+        }
+    };
 
-			const idUser = req.user.payload.id;
+    static async me(req, res, next) {
+        try {
+            // Get user from req
+            const signedUser = req.user.payload;
+            const user = await UserService.findById(signedUser.id);
 
-			const data = await UserService.createChat(idUser);
+            if (user) {
 
-			return res.respond({
-				data,
-				message: 'Chat created successfully',
-			});
+                // delete password
+                delete user.password;
 
-		} catch(e) {
-			next(createError(404, e.message));
-		}
-	}
+                res.respond({
+                    data: user,
+                    message: 'User found',
+                });
+            }
+        } catch (e) {
+            next(createError(404, e.message));
+        }
+    };
 
-	static async createChatMessage(req, res, next) {
-		try {
-			const { uid } = req.params;
-			const idUser = req.user.payload.id;
-			const { message } = req.body;
-			const {type} = req.body
+    static async createChat(req, res, next) {
+        try {
 
-			console.log(uid, idUser, message);
+            const idUser = req.user.payload.id;
 
-			const chat = await PrimateService.findBy({ idUser, uid }, 'chat');
-			console.log(chat);
+            const data = await UserService.createChat(idUser);
 
-			if(!chat) {
-				return res.respond({
-					status: 404,
-					message: 'Chat not found',
-				});
-			}
+            return res.respond({
+                data,
+                message: 'Chat created successfully',
+            });
 
-			const data = {
-				idChat: chat.id,
-				idUser,
-				content: message,
-			};
+        } catch (e) {
+            next(createError(404, e.message));
+        }
+    }
 
-			if(type){
-				data.type = type
-			}
+    static async createChatMessage(req, res, next) {
+        try {
+            const {uid} = req.params;
+            const idUser = req.user.payload.id;
+            const {message} = req.body;
+            const {type} = req.body
 
-			const chatMessage = await PrimateService.create(data, 'message');
+            console.log(uid, idUser, message);
 
-			return res.respond({
-				data: chatMessage,
-				message: 'Chat message created successfully',
-			});
+            const chat = await PrimateService.findBy({idUser, uid}, 'chat');
+            console.log(chat);
 
-		} catch(e) {
-			next(createError(404, e.message));
-		}
-	}
+            if (!chat) {
+                return res.respond({
+                    status: 404,
+                    message: 'Chat not found',
+                });
+            }
 
-	static async getChat(req, res, next) {
-		try {
-			const { uid } = req.params;
-			const idUser = req.user.payload.id;
+            const data = {
+                idChat: chat.id,
+                idUser,
+                content: message,
+            };
 
-			const chat = await PrimateService.findBy({
-				idUser: idUser,
-				uid: uid,
-			}, 'chat', { include: { messages: true } });
+            if (type) {
+                data.type = type
+            }
 
-			if(!chat) {
-				return res.respond({
-					status: 404,
-					message: 'Chat not found',
-				});
-			}
+            const chatMessage = await PrimateService.create(data, 'message');
 
-			return res.respond({
-				data: chat,
-				message: 'Chat found',
-			});
+            return res.respond({
+                data: chatMessage,
+                message: 'Chat message created successfully',
+            });
 
-		} catch(e) {
-			next(createError(404, e.message));
-		}
-	}
+        } catch (e) {
+            next(createError(404, e.message));
+        }
+    }
+
+    static async getChat(req, res, next) {
+        try {
+            const {uid} = req.params;
+            const idUser = req.user.payload.id;
+
+            const chat = await PrimateService.findBy({
+                idUser: idUser,
+                uid: uid,
+            }, 'chat', {include: {messages: true}});
+
+            if (!chat) {
+                return res.respond({
+                    status: 404,
+                    message: 'Chat not found',
+                });
+            }
+
+            return res.respond({
+                data: chat,
+                message: 'Chat found',
+            });
+
+        } catch (e) {
+            next(createError(404, e.message));
+        }
+    }
 
 }
 
