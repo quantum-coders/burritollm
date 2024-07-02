@@ -191,31 +191,63 @@ class UserController extends PrimateController {
     }
 
     static async getChat(req, res, next) {
-        try {
-            const {uid} = req.params;
-            const idUser = req.user.payload.id;
+    try {
+        const { uid } = req.params;
+        const idUser = req.user.payload.id;
 
-            const chat = await PrimateService.findBy({
+        const chat = await prisma.chat.findFirst({
+            where: {
                 idUser: idUser,
                 uid: uid,
-            }, 'chat', {include: {messages: true}});
-
-            if (!chat) {
-                return res.respond({
-                    status: 404,
-                    message: 'Chat not found',
-                });
+            },
+            include: {
+                messages: true,
+                user: {
+                    select: {
+                        wallet: true
+                    }
+                },
+                _count: {
+                    select: {
+                        messages: true
+                    }
+                }
             }
+        });
 
+        if (!chat) {
             return res.respond({
-                data: chat,
-                message: 'Chat found',
+                status: 404,
+                message: 'Chat not found',
             });
-
-        } catch (e) {
-            next(createError(404, e.message));
         }
+
+        const messageStatistics = {
+            count: chat._count.messages,
+            created: chat.created,
+            modified: chat.messages.length > 0
+                ? chat.messages.reduce((latest, message) =>
+                    message.modified > latest ? message.modified : latest,
+                    chat.created
+                )
+                : chat.created
+        };
+
+        const formattedChat = {
+            ...chat,
+            messageStatistics,
+            _count: undefined
+        };
+
+        return res.respond({
+            data: formattedChat,
+            message: 'Chat found',
+        });
+
+    } catch (e) {
+        next(createError(404, e.message));
     }
+}
 
 }
 
