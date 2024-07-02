@@ -7,6 +7,8 @@ const router = getRouter();
 
 // generate chat name
 router.post('/generate-chat-name/:uid', auth, ChatController.generateChatName);
+// download chat
+router.get('/:uid/download', auth, ChatController.downloadChat);
 
 setupRoute('chat', router);
 

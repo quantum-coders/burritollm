@@ -2,7 +2,7 @@ import createError from 'http-errors';
 import queryString from 'query-string';
 import axios from 'axios';
 import UserService from './user.service.js';
-import {jwt, PrimateController, PrimateService} from '@thewebchimp/primate';
+import {jwt, PrimateController, PrimateService, prisma} from '@thewebchimp/primate';
 
 class UserController extends PrimateController {
 
@@ -10,41 +10,39 @@ class UserController extends PrimateController {
         try {
             const idUser = req.user.payload.id;
 
-            const chats = await PrimateService.findBy(
-                {idUser},
-                'chat',
-                {
-                    select: {
-                        id: true,
-                        name: true,
-                        uid: true,
-                        description: true,
-                        idUser: true,
-                        system: true,
-                        status: true,
-                        created: true,
-                        user: {
-                            select: {
-                                wallet: true
-                            }
+            console.log("[GETCHATS: ], ", idUser)
+            const chats = await prisma.chat.findMany({
+                where: {idUser},
+                select: {
+                    id: true,
+                    name: true,
+                    uid: true,
+                    description: true,
+                    idUser: true,
+                    system: true,
+                    status: true,
+                    created: true,
+                    user: {
+                        select: {
+                            wallet: true
+                        }
+                    },
+                    messages: {
+                        orderBy: {
+                            modified: 'desc'
                         },
-                        messages: {
-                            orderBy: {
-                                modified: 'desc'
-                            },
-                            take: 1,
-                            select: {
-                                modified: true
-                            }
-                        },
-                        _count: {
-                            select: {
-                                messages: true
-                            }
+                        take: 1,
+                        select: {
+                            modified: true
+                        }
+                    },
+                    _count: {
+                        select: {
+                            messages: true
                         }
                     }
                 }
-            )
+            });
             console.log(chats)
             // if there is only one chat it is an object so convert to array
             const chatsArray = Array.isArray(chats) ? chats : [chats];
@@ -138,6 +136,7 @@ class UserController extends PrimateController {
 
             const idUser = req.user.payload.id;
 
+            console.log("IDUSER: ", idUser)
             const data = await UserService.createChat(idUser);
 
             return res.respond({
