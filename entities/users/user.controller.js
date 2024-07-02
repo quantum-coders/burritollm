@@ -191,63 +191,101 @@ class UserController extends PrimateController {
     }
 
     static async getChat(req, res, next) {
-    try {
-        const { uid } = req.params;
-        const idUser = req.user.payload.id;
+        try {
+            const {uid} = req.params;
+            const idUser = req.user.payload.id;
 
-        const chat = await prisma.chat.findFirst({
-            where: {
-                idUser: idUser,
-                uid: uid,
-            },
-            include: {
-                messages: true,
-                user: {
-                    select: {
-                        wallet: true
-                    }
+            const chat = await prisma.chat.findFirst({
+                where: {
+                    idUser: idUser,
+                    uid: uid,
                 },
-                _count: {
-                    select: {
-                        messages: true
+                include: {
+                    messages: true,
+                    user: {
+                        select: {
+                            wallet: true
+                        }
+                    },
+                    _count: {
+                        select: {
+                            messages: true
+                        }
                     }
                 }
-            }
-        });
-
-        if (!chat) {
-            return res.respond({
-                status: 404,
-                message: 'Chat not found',
             });
+
+            if (!chat) {
+                return res.respond({
+                    status: 404,
+                    message: 'Chat not found',
+                });
+            }
+
+            const messageStatistics = {
+                count: chat._count.messages,
+                created: chat.created,
+                modified: chat.messages.length > 0
+                    ? chat.messages.reduce((latest, message) =>
+                            message.modified > latest ? message.modified : latest,
+                        chat.created
+                    )
+                    : chat.created
+            };
+
+            const formattedChat = {
+                ...chat,
+                messageStatistics,
+                _count: undefined
+            };
+
+            return res.respond({
+                data: formattedChat,
+                message: 'Chat found',
+            });
+
+        } catch (e) {
+            next(createError(404, e.message));
         }
-
-        const messageStatistics = {
-            count: chat._count.messages,
-            created: chat.created,
-            modified: chat.messages.length > 0
-                ? chat.messages.reduce((latest, message) =>
-                    message.modified > latest ? message.modified : latest,
-                    chat.created
-                )
-                : chat.created
-        };
-
-        const formattedChat = {
-            ...chat,
-            messageStatistics,
-            _count: undefined
-        };
-
-        return res.respond({
-            data: formattedChat,
-            message: 'Chat found',
-        });
-
-    } catch (e) {
-        next(createError(404, e.message));
     }
-}
+
+    //updateChatPatch
+    static async updateChatPatch(req, res, next) {
+        try {
+            const {uid} = req.params;
+            const idUser = req.user.payload.id;
+            const updateData = req.body;
+
+            // Verificar que el chat existe y pertenece al usuario
+            const chat = await prisma.chat.findFirst({
+                where: {
+                    idUser: idUser,
+                    uid: uid,
+                },
+            });
+
+            if (!chat) {
+                return res.respond({
+                    status: 404,
+                    message: 'Chat not found',
+                });
+            }
+
+            // Actualizar solo los campos proporcionados
+            const updatedChat = await prisma.chat.update({
+                where: {id: chat.id},
+                data: updateData,
+            });
+
+            return res.respond({
+                data: updatedChat,
+                message: 'Chat updated successfully',
+            });
+
+        } catch (e) {
+            next(createError(400, e.message));
+        }
+    }
 
 }
 

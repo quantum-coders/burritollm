@@ -13,6 +13,7 @@ router.get('/me', auth, UserController.me);
 router.post('/me/chats', auth, UserController.createChat);
 router.get('/me/chats', auth, UserController.getChats);
 router.get('/me/chats/:uid', auth, UserController.getChat);
+router.patch('/me/chats/:uid', auth, UserController.updateChatPatch);
 router.post('/me/chats/:uid/messages', auth, UserController.createChatMessage);
 
 /*
