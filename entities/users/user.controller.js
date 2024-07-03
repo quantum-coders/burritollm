@@ -215,6 +215,10 @@ class UserController extends PrimateController {
                 }
             });
 
+            // if metas is empty define {}
+            if (!chat.metas) {
+                chat.metas = {}
+            }
             if (!chat) {
                 return res.respond({
                     status: 404,
