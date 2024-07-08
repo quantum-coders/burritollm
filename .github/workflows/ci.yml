@@ -29,6 +29,6 @@ jobs:
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             yarn install
-            yarn checkout -- yarn.lock
+            git checkout -- yarn.lock
             yarn prisma generate
             pm2 restart ${{ secrets.PROCESS_NAME }}
