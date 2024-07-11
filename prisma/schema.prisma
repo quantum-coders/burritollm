@@ -23,8 +23,10 @@ model User {
   created    DateTime @default(now()) @map("created")
   modified   DateTime @default(now()) @map("modified")
 
-  messages Message[]
-  chats    Chat[]
+  messages    Message[]
+  chats       Chat[]
+  userBalance UserBalance?
+  modelUsages ModelUsage[]
 
   @@map("user")
 }
@@ -39,27 +41,29 @@ model Message {
   created    DateTime @default(now()) @map("created")
   modified   DateTime @default(now()) @map("modified")
 
-  responses     Message[] @relation("responses")
-  parentMessage Message?  @relation("responses", fields: [responseTo], references: [id])
-  user          User      @relation(fields: [idUser], references: [id])
-  chat          Chat?     @relation(fields: [idChat], references: [id])
+  responses     Message[]    @relation("responses")
+  parentMessage Message?     @relation("responses", fields: [responseTo], references: [id])
+  user          User         @relation(fields: [idUser], references: [id])
+  chat          Chat?        @relation(fields: [idChat], references: [id])
+  modelUsages   ModelUsage[]
 
   @@map("message")
 }
 
 model Chat {
-  id          Int       @id @default(autoincrement())
-  uid         String    @unique @default(cuid())
-  name        String    @default("New Chat")
-  description String?   @db.Text
-  idUser      Int       @map("id_user")
-  system      String    @db.LongText
-  status      String    @default("active")
-  user        User      @relation(fields: [idUser], references: [id])
-  created     DateTime  @default(now()) @map("created")
-  modified    DateTime  @default(now()) @map("modified")
+  id          Int          @id @default(autoincrement())
+  uid         String       @unique @default(cuid())
+  name        String       @default("New Chat")
+  description String?      @db.Text
+  idUser      Int          @map("id_user")
+  system      String       @db.LongText
+  status      String       @default("active")
+  user        User         @relation(fields: [idUser], references: [id])
+  created     DateTime     @default(now()) @map("created")
+  modified    DateTime     @default(now()) @map("modified")
   messages    Message[]
-  metas       Json?     @default("{}")
+  metas       Json?        @default("{}")
+  modelUsages ModelUsage[]
 
   @@map("chat")
 }
@@ -78,4 +82,64 @@ model Attachment {
   modified   DateTime @default(now()) @map("modified")
 
   @@map("attachment")
+}
+
+model AIModel {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  description String?      @db.Text
+  inputCost   Decimal      @db.Decimal(10, 2)
+  outputCost  Decimal      @db.Decimal(10, 2)
+  maxOutput   Int
+  latency     Decimal      @db.Decimal(5, 2)
+  throughput  Decimal      @db.Decimal(10, 2)
+  status      String       @default("active")
+  created     DateTime     @default(now())
+  modified    DateTime     @default(now()) @updatedAt
+  modelUsages ModelUsage[]
+
+  @@map("ai_model")
+}
+
+model UserBalance {
+  id           Int                  @id @default(autoincrement())
+  idUser       Int                  @unique @map("id_user")
+  balance      Decimal              @db.Decimal(10, 8)
+  created      DateTime             @default(now())
+  modified     DateTime             @default(now()) @updatedAt
+  user         User                 @relation(fields: [idUser], references: [id])
+  transactions BalanceTransaction[]
+
+  @@map("user_balance")
+}
+
+model BalanceTransaction {
+  id            Int         @id @default(autoincrement())
+  idUserBalance Int         @map("id_user_balance")
+  idPayment     String?     @map("id_payment")
+  amount        Decimal     @db.Decimal(10, 8)
+  type          String // "credit" or "debit"
+  description   String?     @db.Text
+  created       DateTime    @default(now())
+  userBalance   UserBalance @relation(fields: [idUserBalance], references: [id])
+
+  @@map("balance_transaction")
+}
+
+model ModelUsage {
+  id            Int      @id @default(autoincrement())
+  idUser        Int      @map("id_user")
+  idModel       Int      @map("id_model")
+  idChat        Int      @map("id_chat")
+  idMessage     Int      @map("id_message")
+  tokensUsed    Int
+  cost          Decimal  @db.Decimal(10, 8)
+  balanceBefore Decimal  @db.Decimal(10, 8) @map("balance_before") @default(0)
+  created       DateTime @default(now())
+  user          User     @relation(fields: [idUser], references: [id])
+  aiModel       AIModel  @relation(fields: [idModel], references: [id])
+  chat          Chat     @relation(fields: [idChat], references: [id])
+  message       Message  @relation(fields: [idMessage], references: [id])
+
+  @@map("model_usage")
 }
