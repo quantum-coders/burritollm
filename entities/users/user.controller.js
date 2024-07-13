@@ -117,7 +117,21 @@ class UserController extends PrimateController {
             const user = await UserService.findById(signedUser.id);
 
             if (user) {
+                const balance = await prisma.userBalance.findFirst({
+                    where: {
+                        idUser: user.id
+                    }
+                });
 
+                // si no tiene balance y no tiene ningun registro en la tabla de balance crea una entrada y ponle de balance 5.00 usd
+                if (!balance) {
+                    await prisma.userBalance.create({
+                        data: {
+                            idUser: user.id,
+                            balance: 5.00
+                        }
+                    });
+                }
                 // delete password
                 delete user.password;
 
