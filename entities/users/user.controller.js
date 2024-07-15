@@ -134,7 +134,10 @@ class UserController extends PrimateController {
                 }
                 // delete password
                 delete user.password;
-
+                /// add the balance to the user object
+                user.balance = balance ? balance.balance : 0.00;
+                // parse float
+                user.balance = parseFloat(user.balance);
                 res.respond({
                     data: user,
                     message: 'User found',
