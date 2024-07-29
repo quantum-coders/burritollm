@@ -305,9 +305,9 @@ class Web3Service {
             }
 
             const dbPaymentEntries = dbPaymentHistory.map(tx => ({
-                amount: tx.amount.toFixed(6),
+                amount: tx.amount.toFixed(8),
                 currency: tx.currency,
-                timestamp: tx.timestamp.toString() // Convertimos BigInt a string para la comparación
+                timestamp: tx.timestamp.toString()
             }));
 
             const missingTransactions = paymentHistoryFromContract.filter(contractTx => {
@@ -315,7 +315,7 @@ class Web3Service {
                 const currency = contractTx.avaxAmount !== '0.0' ? 'AVAX' : 'USDT';
 
                 return !dbPaymentEntries.some(dbTx =>
-                    dbTx.amount === amount &&
+                    dbTx.amount === parseFloat(amount).toFixed(8) &&
                     dbTx.currency === currency &&
                     dbTx.timestamp === contractTx.timestamp.toString()
                 );
@@ -342,43 +342,55 @@ class Web3Service {
                     console.log(`Using ${tx.usdtAmount} USDT as is`);
                 }
 
-                const currentBalance = parseFloat(user.userBalance.balance);
-                const newBalance = currentBalance + amountInUsd;
-
-                console.log(`Current Balance: ${currentBalance}`);
-                console.log(`Amount to add: ${amountInUsd}`);
-                console.log(`New Balance: ${newBalance}`);
-
-                await prisma.userBalance.update({
-                    where: {idUser: user.id},
-                    data: {balance: newBalance.toFixed(8)},
-                });
-
-                console.log(`Updated balance for user ${userAddress} to ${newBalance.toFixed(8)}`);
-
-                await prisma.balanceTransaction.create({
-                    data: {
+                const existingTransaction = await prisma.balanceTransaction.findFirst({
+                    where: {
                         idUserBalance: user.userBalance.id,
                         amount: amountInUsd.toFixed(8),
-                        currency: tx.avaxAmount !== '0.0' ? 'AVAX' : 'USDT',
-                        type: 'credit',
-                        description: 'Synced from blockchain',
-                        created: new Date(tx.timestamp * 1000),
-                        timestamp: BigInt(tx.timestamp), // Guardamos el timestamp como BigInt
-                        txHash: tx.txHash || null
+                        timestamp: BigInt(tx.timestamp)
                     },
                 });
 
-                console.log(`Recorded transaction: ${JSON.stringify({
-                    idUserBalance: user.userBalance.id,
-                    amount: amountInUsd.toFixed(8),
-                    currency: tx.avaxAmount !== '0.0' ? 'AVAX' : 'USDT',
-                    type: 'credit',
-                    description: 'Synced from blockchain',
-                    created: new Date(tx.timestamp * 1000),
-                    timestamp: BigInt(tx.timestamp),
-                    txHash: tx.txHash || null
-                })}`);
+                if (!existingTransaction) {
+                    const currentBalance = parseFloat(user.userBalance.balance);
+                    const newBalance = currentBalance + amountInUsd;
+
+                    console.log(`Current Balance: ${currentBalance}`);
+                    console.log(`Amount to add: ${amountInUsd}`);
+                    console.log(`New Balance: ${newBalance}`);
+
+                    await prisma.userBalance.update({
+                        where: {idUser: user.id},
+                        data: {balance: newBalance.toFixed(8)},
+                    });
+
+                    console.log(`Updated balance for user ${userAddress} to ${newBalance.toFixed(8)}`);
+
+                    await prisma.balanceTransaction.create({
+                        data: {
+                            idUserBalance: user.userBalance.id,
+                            amount: amountInUsd.toFixed(8),
+                            currency: tx.avaxAmount !== '0.0' ? 'AVAX' : 'USDT',
+                            type: 'crypto',
+                            description: 'Synced from blockchain',
+                            created: new Date(tx.timestamp * 1000),
+                            timestamp: BigInt(tx.timestamp),
+                            txHash: tx.txHash || null
+                        },
+                    });
+
+                    console.log(`Recorded transaction: ${JSON.stringify({
+                        idUserBalance: user.userBalance.id,
+                        amount: amountInUsd.toFixed(8),
+                        currency: tx.avaxAmount !== '0.0' ? 'AVAX' : 'USDT',
+                        type: 'crypto',
+                        description: 'Synced from blockchain',
+                        created: new Date(tx.timestamp * 1000),
+                        timestamp: BigInt(tx.timestamp),
+                        txHash: tx.txHash || null
+                    })}`);
+                } else {
+                    console.log(`Transaction already exists: ${JSON.stringify(existingTransaction)}`);
+                }
             }
 
             console.log(`Payment history synchronized successfully for user: ${userAddress}`);
