@@ -1,4 +1,5 @@
 import Web3Service from "../services/web3.service.js";
+import {prisma} from "@thewebchimp/primate";
 
 class Web3Controller {
     static async getStakedBalance(req, res) {
@@ -174,6 +175,111 @@ class Web3Controller {
         }
     }
 
+    static async buildRecordPaymentTransaction(req, res) {
+        const {avaxAmount, usdtAmount} = req.body;
+        const signerAddress = req.params.userAddress;
+
+        console.log(`Building record payment transaction for user ${signerAddress} with AVAX: ${avaxAmount} and USDT: ${usdtAmount}`);
+        try {
+            const recordPaymentTx = await Web3Service.buildRecordPaymentTransaction(avaxAmount, usdtAmount, signerAddress);
+            res.respond({
+                data: recordPaymentTx,
+                message: "Record payment transaction built successfully",
+            });
+        } catch (error) {
+            console.error("Error building record payment transaction:", error);
+            res.respond({
+                error: error.message,
+                message: "Failed to build record payment transaction",
+            }, 500);
+        }
+    }
+
+    // Nueva función para obtener el historial de pagos
+    static async getPaymentHistory(req, res) {
+        const {userAddress} = req.params;
+        console.log(`Fetching payment history for user ${userAddress}...`);
+        try {
+            const paymentHistory = await Web3Service.getPaymentHistory(userAddress);
+            res.respond({
+                data: paymentHistory,
+                message: "Payment history fetched successfully",
+            });
+        } catch (error) {
+            console.error(`Error fetching payment history for user ${userAddress}:`, error);
+            res.respond({
+                error: error.message,
+                message: "Failed to fetch payment history",
+            }, 500);
+        }
+    }
+
+    // Nueva función para construir la transacción de retirar fondos
+    static async buildWithdrawFundsTransaction(req, res) {
+        const {avaxAmount, usdtAmount} = req.body;
+        const signerAddress = req.params.userAddress;
+
+        console.log(`Building withdraw funds transaction for user ${signerAddress} with AVAX: ${avaxAmount} and USDT: ${usdtAmount}`);
+        try {
+            const withdrawFundsTx = await Web3Service.buildWithdrawFundsTransaction(avaxAmount, usdtAmount, signerAddress);
+            res.respond({
+                data: withdrawFundsTx,
+                message: "Withdraw funds transaction built successfully",
+            });
+        } catch (error) {
+            console.error("Error building withdraw funds transaction:", error);
+            res.respond({
+                error: error.message,
+                message: "Failed to build withdraw funds transaction",
+            }, 500);
+        }
+    }
+
+    // Nueva función para construir la transacción de retirar todos los fondos
+    static async buildWithdrawAllFundsTransaction(req, res) {
+        const signerAddress = req.params.userAddress;
+        console.log(`Building withdraw all funds transaction for user ${signerAddress}...`);
+        try {
+            const withdrawAllFundsTx = await Web3Service.buildWithdrawAllFundsTransaction(signerAddress);
+            res.respond({
+                data: withdrawAllFundsTx,
+                message: "Withdraw all funds transaction built successfully",
+            });
+        } catch (error) {
+            console.error("Error building withdraw all funds transaction:", error);
+            res.respond({
+                error: error.message,
+                message: "Failed to build withdraw all funds transaction",
+            }, 500);
+        }
+    }
+
+    static async synchronizePaymentHistory(req, res) {
+        const idUser = req.user.payload.id;
+        console.log("idUser is", idUser)
+        console.log(`Synchronizing payment history for user ${idUser}...`);
+        const user = await prisma.user.findUnique({
+            where: {
+                id: idUser,
+            },
+        });
+
+
+
+        console.log(`Synchronizing payment history for user ${user.wallet}...`);
+        try {
+            await Web3Service.synchronizePaymentHistory(user.wallet)
+
+            res.status(200).json({
+                message: 'Payment history synchronized successfully',
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error.message,
+                message: 'Failed to synchronize payment history',
+            });
+        }
+    }
 }
 
 export default Web3Controller;

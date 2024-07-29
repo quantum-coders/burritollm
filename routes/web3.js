@@ -29,5 +29,25 @@ router.get('/active-stakes/:userAddress', Web3Controller.getActiveStakes);
 router.get('/staking-history/:userAddress', Web3Controller.getStakingHistory);
 
 
+// Añadir la nueva ruta para obtener los active stakes de un usuario
+router.get('/active-stakes/:userAddress', Web3Controller.getActiveStakes);
+
+// Añadir la nueva ruta para obtener el historial de staking de un usuario
+router.get('/staking-history/:userAddress', Web3Controller.getStakingHistory);
+
+// Ruta para construir la transacción de registrar pago
+router.post('/build-record-payment-transaction/:userAddress', Web3Controller.buildRecordPaymentTransaction);
+
+// Ruta para obtener el historial de pagos
+router.get('/payment-history/:userAddress', Web3Controller.getPaymentHistory);
+
+// Ruta para construir la transacción de retirar fondos
+router.post('/build-withdraw-funds-transaction/:userAddress', Web3Controller.buildWithdrawFundsTransaction);
+
+// Ruta para construir la transacción de retirar todos los fondos
+router.post('/build-withdraw-all-funds-transaction/:userAddress', Web3Controller.buildWithdrawAllFundsTransaction);
+
+router.get('/synchronize-payment-history', auth, Web3Controller.synchronizePaymentHistory);
+
 
 export { router };
