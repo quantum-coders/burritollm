@@ -101,16 +101,20 @@ model AIModel {
   @@map("ai_model")
 }
 
-model UserBalance {
-  id           Int                  @id @default(autoincrement())
-  idUser       Int                  @unique @map("id_user")
-  balance      Decimal              @db.Decimal(10, 8)
-  created      DateTime             @default(now())
-  modified     DateTime             @default(now()) @updatedAt
-  user         User                 @relation(fields: [idUser], references: [id])
-  transactions BalanceTransaction[]
+model BalanceTransaction {
+  id            Int         @id @default(autoincrement())
+  idUserBalance Int         @map("id_user_balance")
+  idPayment     String?     @map("id_payment") @db.Text
+  amount        Decimal     @db.Decimal(10, 8)
+  currency      String
+  type          String
+  description   String?     @db.Text
+  created       DateTime    @default(now())
+  timestamp     BigInt
+  txHash        String?     @db.Text
+  userBalance   UserBalance @relation(fields: [idUserBalance], references: [id])
 
-  @@map("user_balance")
+  @@map("balance_transaction")
 }
 
 model BalanceTransaction {
