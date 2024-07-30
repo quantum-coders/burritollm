@@ -12,12 +12,12 @@ class AiService {
 
         const tokenEstimate = promptTokensEstimate({messages, functions: tools});
         console.log(`Estimated token count: ${tokenEstimate}`);
-
+        console.log("MEssages", messages)
         const requestBody = {
             model,
             messages,
             temperature: 0.5,
-            max_tokens: 4096,
+            max_tokens: 1500,
             top_p: 1,
             frequency_penalty: 0,
             presence_penalty: 0,

@@ -9,11 +9,44 @@ const groqAPIKey = process.env.GROQ_API_KEY;
 const openRouterApiKey = process.env.OPEN_ROUTER_KEY;
 
 class AIController {
+    static createChunks(text, chunkSize) {
+        const chunks = [];
+        for (let i = 0; i < text.length; i += chunkSize) {
+            chunks.push(text.slice(i, i + chunkSize));
+        }
+        return chunks;
+    }
     static async sendMessage(req, res) {
         let {model, system, prompt, stream, history, mode, idChat} = req.body;
         const idUser = req.user.payload.id;
         const modelData = await prisma.AIModel.findFirst({where: {name: model}});
         const idModel = modelData.id;
+
+        console.log("Checking if user has sufficient balance...");
+        const b = await AIController.hasSufficientBalance(idUser);
+        console.log("User has sufficient balance:", b);
+        if (!b) {
+            const message = AIController.insufficientFundsMessage();
+                const chunkData = {
+                    id: 'gen-insufficient-funds',
+                    model: model,
+                    object: 'chat.completion.chunk',
+                    created: Math.floor(Date.now() / 1000),
+                    choices: [{
+                        index: 0,
+                        delta: {
+                            role: 'assistant',
+                            content: message
+                        },
+                        finish_reason: 'stop',
+                        logprobs: null
+                    }]
+                };
+                res.write(`data: ${JSON.stringify(chunkData)}\n\n`);
+                res.write('data: [DONE]\n\n');
+                res.end();
+        }
+
 
         if (typeof stream === 'undefined') stream = true;
         if (typeof history === 'undefined') history = [];
@@ -375,7 +408,7 @@ class AIController {
     static async updateUserData(idUser, idModel, idChat, tokensUsed, totalCost) {
         try {
             console.log("REALIZANDO EL UPSERT: ", totalCost);
-                        // Obtener el balance actual del usuario
+            // Obtener el balance actual del usuario
             const existingBalance = await prisma.userBalance.findUnique({
                 where: {idUser}
             });
@@ -449,6 +482,29 @@ class AIController {
         }
     }
 
+
+    static async hasSufficientBalance(userId) {
+        try {
+            const userBalance = await prisma.userBalance.findUnique({
+                where: {idUser: userId},
+            });
+
+            console.log("User balance:", userBalance);
+            // if is 0 or negative return false
+            if (!userBalance || userBalance.balance <= 0) {
+                return false;
+            }
+
+            return true; // Sufficient balance
+        } catch (error) {
+            console.error('Error checking user balance:', error);
+            return false; // Treat errors as insufficient balance
+        }
+    }
+
+    static insufficientFundsMessage() {
+        return "I'd love to help, but it seems you've run out of funds. Please add more to your account to continue using my services. Thank you!";
+    }
 }
 
 export default AIController;

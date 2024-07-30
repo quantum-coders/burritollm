@@ -23,18 +23,25 @@ class ChatController extends PrimateController {
                     select: {
                         type: true,
                         content: true,
-                    }
+                    },
+                    take: 3,
                 });
                 // concatenate all messages like this User: message, AI: message, User: message...., ech message has type, one is user the other assistant
                 const concatenatedMessages = getAllMessages.map(message => {
                     return message.type === 'user' ? `User: ${message.content}` : `AI: ${message.content}`;
                 }).join(', ');
+
+                console.log("Concatenate messages: ", concatenatedMessages)
                 const systemPrompt = `You can only do one task, generate as the only output, a short title with emoji for this chat. Here are the messages so far: ${concatenatedMessages}.`;
+
                 const generatedName = await AiService.sendChatCompletion(
                     'google/gemma-2-9b-it:free',
                     systemPrompt,
                     'Title is:',
                 )
+
+
+                console.log("Generated name: ", generatedName)
                 const name = generatedName.choices[0].message.content
                 chat.name = name.replace(/"/g, '');
                 chat.name = chat.name.replace(/(\r\n|\n|\r)/gm, "");
