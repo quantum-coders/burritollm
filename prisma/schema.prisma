@@ -51,18 +51,19 @@ model Message {
 }
 
 model Chat {
-  id          Int          @id @default(autoincrement())
-  uid         String       @unique @default(cuid())
-  name        String       @default("New Chat")
-  description String?      @db.Text
-  idUser      Int          @map("id_user")
-  system      String       @db.LongText
-  status      String       @default("active")
-  user        User         @relation(fields: [idUser], references: [id])
-  created     DateTime     @default(now()) @map("created")
-  modified    DateTime     @default(now()) @map("modified")
+  id          Int       @id @default(autoincrement())
+  uid         String    @unique @default(cuid())
+  name        String    @default("New Chat")
+  description String?   @db.Text
+  idUser      Int       @map("id_user")
+  system      String    @db.LongText
+  status      String    @default("active")
+  created     DateTime  @default(now()) @map("created")
+  modified    DateTime  @default(now()) @map("modified")
   messages    Message[]
-  metas       Json?        @default("{}")
+  metas       Json?     @default("{}")
+
+  user        User         @relation(fields: [idUser], references: [id])
   modelUsages ModelUsage[]
 
   @@map("chat")
@@ -85,17 +86,18 @@ model Attachment {
 }
 
 model AIModel {
-  id          Int          @id @default(autoincrement())
-  name        String       @unique
-  description String?      @db.Text
-  inputCost   Decimal      @db.Decimal(10, 2)
-  outputCost  Decimal      @db.Decimal(10, 2)
-  maxOutput   Int
-  latency     Decimal      @db.Decimal(5, 2)
-  throughput  Decimal      @db.Decimal(10, 2)
-  status      String       @default("active")
-  created     DateTime     @default(now())
-  modified    DateTime     @default(now()) @updatedAt
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?  @db.Text
+  inputCost   Decimal  @map("input_cost") @db.Decimal(10, 2)
+  outputCost  Decimal  @map("output_cost") @db.Decimal(10, 2)
+  maxOutput   Int      @map("max_output")
+  latency     Decimal  @db.Decimal(5, 2)
+  throughput  Decimal  @db.Decimal(10, 2)
+  status      String   @default("active")
+  created     DateTime @default(now())
+  modified    DateTime @default(now()) @updatedAt
+
   modelUsages ModelUsage[]
 
   @@map("ai_model")
@@ -116,6 +118,7 @@ model BalanceTransaction {
 
   @@map("balance_transaction")
 }
+
 model UserBalance {
   id           Int                  @id @default(autoincrement())
   idUser       Int                  @unique @map("id_user")
@@ -134,14 +137,15 @@ model ModelUsage {
   idModel       Int      @map("id_model")
   idChat        Int      @map("id_chat")
   idMessage     Int      @map("id_message")
-  tokensUsed    Int
+  tokensUsed    Int      @map("tokens_used")
   cost          Decimal  @db.Decimal(10, 8)
-  balanceBefore Decimal  @db.Decimal(10, 8) @map("balance_before") @default(0)
+  balanceBefore Decimal  @default(0) @map("balance_before") @db.Decimal(10, 8)
   created       DateTime @default(now())
-  user          User     @relation(fields: [idUser], references: [id])
-  aiModel       AIModel  @relation(fields: [idModel], references: [id])
-  chat          Chat     @relation(fields: [idChat], references: [id])
-  message       Message  @relation(fields: [idMessage], references: [id])
+
+  user    User    @relation(fields: [idUser], references: [id])
+  aiModel AIModel @relation(fields: [idModel], references: [id])
+  chat    Chat    @relation(fields: [idChat], references: [id])
+  message Message @relation(fields: [idMessage], references: [id])
 
   @@map("model_usage")
 }
