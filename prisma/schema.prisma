@@ -128,22 +128,6 @@ model UserBalance {
   @@map("user_balance")
 }
 
-model BalanceTransaction {
-  id            Int         @id @default(autoincrement())
-  idUserBalance Int         @map("id_user_balance")
-  idPayment     String?     @map("id_payment") @db.Text
-  amount        Decimal     @db.Decimal(10, 8)
-  currency      String
-  type          String
-  description   String?     @db.Text
-  created       DateTime    @default(now())
-  timestamp     BigInt
-  txHash        String?     @db.Text
-  userBalance   UserBalance @relation(fields: [idUserBalance], references: [id])
-
-  @@map("balance_transaction")
-}
-
 model ModelUsage {
   id            Int      @id @default(autoincrement())
   idUser        Int      @map("id_user")
