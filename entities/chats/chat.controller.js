@@ -27,13 +27,18 @@ class ChatController extends PrimateController {
                 });
             }
 
-            const totalTokens = chat.messages.reduce((acc, message) => {
-                return acc + message.modelUsages.reduce((msgAcc, usage) => msgAcc + usage.tokensUsed, 0);
+            const totalCost = chat.messages.reduce((acc, message) => {
+                return acc + message.modelUsages.reduce((msgAcc, usage) => msgAcc + parseFloat(usage.cost), 0);
+            }, 0);
+
+            const tokensUsed = chat.messages.reduce((acc, message) => {
+                return acc + message.modelUsages.reduce((msgAcc, usage) => msgAcc + parseFloat(usage.tokensUsed), 0);
             }, 0);
 
             res.respond({
                 data: {
-                    totalTokens,
+                    totalCost,
+                    tokensUsed,
                 },
             });
         } catch (error) {
