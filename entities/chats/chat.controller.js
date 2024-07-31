@@ -5,8 +5,44 @@ import ChatService from "./chat.service.js";
 
 class ChatController extends PrimateController {
 
+    static async getTokensUsage(req, res, next) {
+        const uidChat = req.params.uid;
+
+        try {
+            const chat = await prisma.chat.findUnique({
+                where: {uid: uidChat},
+                include: {
+                    messages: {
+                        include: {
+                            modelUsages: true,
+                        },
+                    },
+                },
+            });
+
+            if (!chat) {
+                return res.respond({
+                    status: 404,
+                    message: 'Chat not found',
+                });
+            }
+
+            const totalTokens = chat.messages.reduce((acc, message) => {
+                return acc + message.modelUsages.reduce((msgAcc, usage) => msgAcc + usage.tokensUsed, 0);
+            }, 0);
+
+            res.respond({
+                data: {
+                    totalTokens,
+                },
+            });
+        } catch (error) {
+            next(error); // Pass the error to your error handling middleware
+        }
+
+    }
+
     static async generateChatName(req, res, next) {
-        console.log("CHECKPONT????")
         const idUser = req.user.payload.id;
         const {uid} = req.params;
         try {

@@ -10,6 +10,8 @@ router.post('/generate-chat-name/:uid', auth, ChatController.generateChatName);
 // download chat
 router.get('/:uid/download', auth, ChatController.downloadChat);
 
+// get tokens usage
+router.get('/token-usage/:uid', auth, ChatController.getTokensUsage);
 setupRoute('chat', router);
 
 export { router };
