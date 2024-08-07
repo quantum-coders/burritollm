@@ -51,19 +51,19 @@ model Message {
 }
 
 model Chat {
-  id          Int       @id @default(autoincrement())
-  uid         String    @unique @default(cuid())
-  name        String    @default("New Chat")
-  description String?   @db.Text
-  idUser      Int       @map("id_user")
-  system      String    @db.LongText
-  status      String    @default("active")
-  created     DateTime  @default(now()) @map("created")
-  modified    DateTime  @default(now()) @map("modified")
-  messages    Message[]
-  metas       Json?     @default("{}")
+  id          Int      @id @default(autoincrement())
+  uid         String   @unique @default(cuid())
+  name        String   @default("New Chat")
+  description String?  @db.Text
+  idUser      Int      @map("id_user")
+  system      String   @db.LongText
+  status      String   @default("active")
+  created     DateTime @default(now()) @map("created")
+  modified    DateTime @default(now()) @map("modified")
+  metas       Json?    @default("{}")
 
   user        User         @relation(fields: [idUser], references: [id])
+  messages    Message[]
   modelUsages ModelUsage[]
 
   @@map("chat")
