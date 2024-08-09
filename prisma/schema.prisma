@@ -149,3 +149,12 @@ model ModelUsage {
 
   @@map("model_usage")
 }
+
+model WaitList {
+  id       Int      @id @default(autoincrement())
+  email    String   @unique
+  created  DateTime @default(now())
+  modified DateTime @default(now())
+
+  @@map("wait_list")
+}
