@@ -23,10 +23,11 @@ model User {
   created    DateTime @default(now()) @map("created")
   modified   DateTime @default(now()) @map("modified")
 
+  userBalance UserBalance?
   messages    Message[]
   chats       Chat[]
-  userBalance UserBalance?
   modelUsages ModelUsage[]
+  images      Image[]
 
   @@map("user")
 }
@@ -157,4 +158,18 @@ model WaitList {
   modified DateTime @default(now())
 
   @@map("wait_list")
+}
+
+model Image {
+  id       Int      @id @default(autoincrement())
+  idUser   Int      @map("id_user")
+  prompt   String   @default("")
+  url      String   @default("")
+  metas    Json?    @default("{}")
+  created  DateTime @default(now())
+  modified DateTime @default(now())
+
+  user User @relation(fields: [idUser], references: [id])
+
+  @@map("image")
 }

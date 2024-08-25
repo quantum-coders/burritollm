@@ -1,9 +1,13 @@
+import 'dotenv/config';
 import axios from 'axios';
+import Replicate from 'replicate';
 
 import { promptTokensEstimate } from 'openai-chat-tokens';
-import { openAIModels, perplexityModels, groqModels, openRouterModels } from '../assets/data/ai-models.js';
+import { groqModels, openAIModels, openRouterModels, perplexityModels } from '../assets/data/ai-models.js';
+import { prisma } from '@thewebchimp/primate';
 
 const { OPEN_ROUTER_KEY } = process.env;
+const replicate = new Replicate();
 
 class AIService {
 	/**
@@ -213,6 +217,26 @@ class AIService {
 			console.error('Error in sendChatCompletion:', error);
 			throw error;
 		}
+	}
+
+	static async createImage(prompt, idUser) {
+		const input = {
+			prompt,
+			disable_safety_checker: true,
+			output_format: 'jpg',
+		};
+
+		const output = await replicate.run('black-forest-labs/flux-schnell', { input });
+		const url = output[0];
+
+		// create image in database
+		return await prisma.image.create({
+			data: {
+				prompt,
+				url,
+				idUser,
+			},
+		});
 	}
 }
 

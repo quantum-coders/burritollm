@@ -1,6 +1,4 @@
 import createError from 'http-errors';
-import queryString from 'query-string';
-import axios from 'axios';
 import UserService from './user.service.js';
 import { jwt, PrimateController, PrimateService, prisma } from '@thewebchimp/primate';
 
@@ -10,7 +8,6 @@ class UserController extends PrimateController {
 		try {
 			const idUser = req.user.payload.id;
 
-			console.log('[GETCHATS: ], ', idUser);
 			const chats = await prisma.chat.findMany({
 				where: { idUser },
 				select: {
@@ -63,6 +60,22 @@ class UserController extends PrimateController {
 		} catch(e) {
 			next(createError(404, e.message));
 		}
+	}
+
+	static async getImages(req, res, next) {
+		try {
+			const idUser = req.user.payload.id;
+			const images = await prisma.image.findMany({
+				where: { idUser },
+			});
+			res.respond({
+				data: images,
+				message: 'Images found',
+			});
+		} catch(e) {
+			next(createError(404, e.message));
+		}
+
 	}
 
 	static async authenticate(req, res, next) {
@@ -332,6 +345,34 @@ class UserController extends PrimateController {
 		}
 	}
 
+	static async deleteImage(req, res, next) {
+		try {
+			const idUser = req.user.payload.id;
+			const { id } = req.params;
+
+			const image = await prisma.image.findFirst({
+				where: { id: parseInt(id), idUser: parseInt(idUser) },
+			});
+
+			if(!image) {
+				return res.respond({
+					status: 404,
+					message: 'Image not found',
+				});
+			}
+
+			await prisma.image.delete({
+				where: { id: parseInt(id) },
+			});
+
+			return res.respond({
+				message: 'Image deleted successfully',
+			});
+
+		} catch(e) {
+			next(createError(404, e.message));
+		}
+	}
 }
 
 export default UserController;

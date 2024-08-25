@@ -16,6 +16,9 @@ router.get('/me/chats/:uid', auth, UserController.getChat);
 router.patch('/me/chats/:uid', auth, UserController.updateChatPatch);
 router.post('/me/chats/:uid/messages', auth, UserController.createChatMessage);
 
+router.get('/me/images', auth, UserController.getImages);
+router.delete('/me/images/:id', auth, UserController.deleteImage);
+
 /*
 router.get('/me/chats', auth, UserController.chats);
 router.get('/me/chats/:uid/messages', auth, UserController.chatMessages);

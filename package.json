@@ -10,6 +10,7 @@
 	},
 	"dependencies": {
 		"@faker-js/faker": "^8.4.1",
+		"@fal-ai/serverless-client": "^0.14.2",
 		"@thewebchimp/primate": "^1.1.15-entities",
 		"aws-sdk": "^2.1613.0",
 		"axios": "^1.6.7",
@@ -27,6 +28,7 @@
 		"pptxgenjs": "^3.12.0",
 		"puppeteer": "^22.7.1",
 		"query-string": "^9.0.0",
+		"replicate": "^0.32.0",
 		"slugify": "^1.6.6",
 		"stripe": "^15.4.0",
 		"uuid": "^9.0.1"

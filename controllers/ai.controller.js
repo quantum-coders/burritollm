@@ -47,10 +47,10 @@ class AIController {
 			stream = true,
 			history = [],
 			mode,
-			temperature = 0.5,
+			temperature = 1,
 			maxTokens = 1024,
 			topP = 1,
-			frequencyPenalty = 0.0001,
+			frequencyPenalty = 0,
 			presencePenalty = 0,
 			stop = '',
 		} = body;
@@ -133,6 +133,42 @@ class AIController {
 					message: 'Error to process the request: ' + error.message,
 				});
 			}
+		}
+	}
+
+	static async createImage(req, res) {
+		try {
+			const prompt = req.body.prompt;
+
+			if(!prompt) {
+				return res.respond({
+					status: 400,
+					message: 'Missing required fields: prompt',
+				});
+			}
+
+			const idUser = req.user.payload.id;
+
+			if(!idUser) {
+				return res.respond({
+					status: 401,
+					message: 'Unauthorized',
+				});
+			}
+
+			const image = await AIService.createImage(prompt, idUser);
+
+			res.respond({
+				status: 200,
+				data: image,
+			});
+
+		} catch(e) {
+			console.error('Error:', e);
+			res.respond({
+				status: 500,
+				message: 'Error to process the request: ' + e.message,
+			});
 		}
 	}
 
