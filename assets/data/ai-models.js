@@ -31,8 +31,12 @@ const groqModels = [
 
 const openRouterModels = [
 	'cognitivecomputations/dolphin-mixtral-8x7b',
+	'google/gemma-2-9b-it:free',
+	'mistralai/mistral-7b-instruct:free',
+	'google/gemini-pro',
 	'neversleep/llama-3-lumimaid-70b',
-	'burrito-8x7b'
+	'burrito-8x7b',
+	'openai/gpt-4o-mini'
 ];
 
 export { openAIModels, perplexityModels, groqModels, openRouterModels };

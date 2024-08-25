@@ -10,13 +10,19 @@ class ExaService {
 
 	/**
 	 * Perform a search with a query and return the results.
-	 * @param {string} query - The query string.
-	 * @param {Object} options - Additional search options.
+	 *
+	 * This function sends a search query to the Exa API with various options, such as the type of search,
+	 * the number of results to return, and whether to include the text in the results. It handles the request
+	 * and returns the search results as a promise.
+	 *
+	 * @param {string} query - The query string to search for.
+	 * @param {Object} [options={}] - Additional search options.
 	 * @param {string} [options.type='neural'] - The type of search ('keyword', 'neural', or 'magic').
 	 * @param {boolean} [options.useAutoprompt=false] - If true, converts your query to an Exa query.
 	 * @param {number} [options.numResults=10] - Number of search results to return.
 	 * @param {boolean} [options.text=false] - If true, includes the text in the results.
-	 * @returns {Promise<Object>} - The search results.
+	 * @returns {Promise<Object>} - A promise that resolves to the search results.
+	 * @throws {Error} - Throws an error if the search request fails.
 	 * @example
 	 * const results = await ExaService.search('hottest AI startups', { type: 'neural', useAutoprompt: true, numResults: 10, text: true });
 	 * console.log(results);
@@ -24,16 +30,17 @@ class ExaService {
 	static async search(query, options = {}) {
 		try {
 			const response = await axios.post(
-				`${ this.baseUrl }/search`,
-				{ query, ...options },
-				{ headers: { 'x-api-key': process.env.EXA_API_KEY } },
+				`${this.baseUrl}/search`,
+				{query, ...options},
+				{headers: {'x-api-key': process.env.EXA_API_KEY}},
 			);
 			return response.data;
-		} catch(error) {
+		} catch (error) {
 			console.error('Error:', error);
 			throw error;
 		}
 	}
+
 
 	/**
 	 * Get contents of documents based on a list of document IDs.
@@ -46,12 +53,12 @@ class ExaService {
 	static async getContents(ids) {
 		try {
 			const response = await axios.post(
-				`${ this.baseUrl }/contents`,
-				{ ids },
-				{ headers: { 'x-api-key': process.env.EXA_API_KEY } },
+				`${this.baseUrl}/contents`,
+				{ids},
+				{headers: {'x-api-key': process.env.EXA_API_KEY}},
 			);
 			return response.data;
-		} catch(error) {
+		} catch (error) {
 			console.error('Error:', error);
 			throw error;
 		}
@@ -72,12 +79,12 @@ class ExaService {
 	static async findSimilar(url, options = {}) {
 		try {
 			const response = await axios.post(
-				`${ this.baseUrl }/findSimilar`,
-				{ url, ...options },
-				{ headers: { 'x-api-key': process.env.EXA_API_KEY } },
+				`${this.baseUrl}/findSimilar`,
+				{url, ...options},
+				{headers: {'x-api-key': process.env.EXA_API_KEY}},
 			);
 			return response.data;
-		} catch(error) {
+		} catch (error) {
 			console.error('Error:', error);
 			throw error;
 		}
@@ -97,9 +104,9 @@ class ExaService {
 	 */
 	static generateAPA(items) {
 		return items.map(item => {
-			const { title, url, publishedDate, author } = item;
+			const {title, url, publishedDate, author} = item;
 			const year = publishedDate ? new Date(publishedDate).getFullYear() : 'n.d.';
-			return `${ author || 'Anonymous' }. (${ year }). ${ title }. Retrieved from ${ url }`;
+			return `${author || 'Anonymous'}. (${year}). ${title}. Retrieved from ${url}`;
 		});
 	}
 }
