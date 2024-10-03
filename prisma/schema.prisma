@@ -34,6 +34,7 @@ model User {
 
 model Message {
   id         Int      @id @default(autoincrement())
+  uid        String?  @unique @default(cuid())
   idChat     Int      @map("id_chat")
   idUser     Int      @map("id_user")
   content    String   @db.LongText
