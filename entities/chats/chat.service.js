@@ -57,8 +57,10 @@ class ChatService {
 			},
 		});
 
-		console.log(chat);
-		console.log(chat.messages);
+		/// for each message you should convert it like this role== 'assistant' ? 'assistant: ' + message.content : 'user: ' + message.content
+
+		// return chat.messages;
+
 
 		return chat.messages;
 	}

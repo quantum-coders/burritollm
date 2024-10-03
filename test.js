@@ -8,4 +8,3 @@ const result = await fal.subscribe('fal-ai/flux', {
 	enable_safety_checker: false,
 });
 
-console.log(result);

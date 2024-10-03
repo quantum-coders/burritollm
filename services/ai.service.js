@@ -6,7 +6,7 @@ import ExaService from "./exa.service.js";
 import {prisma} from "@thewebchimp/primate";
 import Replicate from 'replicate';
 
-const { OPEN_ROUTER_KEY } = process.env;
+const {OPEN_ROUTER_KEY} = process.env;
 const replicate = new Replicate();
 
 class AIService {
@@ -19,9 +19,11 @@ class AIService {
 	 * @throws {Error} - Throws an error if there is an issue with the request or the response.
 	 */
 	static async sendMessage(data, provider) {
-		console.log("DATA: ", data)
 		const bearerToken = AIService.solveProviderAuth(provider);
 		const url = AIService.solveProviderUrl(provider);
+
+		/// console info the payload of the request
+		console.info('Payload:', data);
 		return await axios.post(url, data, {
 			headers: {
 				'Content-Type': 'application/json',
@@ -68,6 +70,43 @@ class AIService {
 		return url;
 	}
 
+	static estimateTokens(messages) {
+		return promptTokensEstimate({messages});
+	}
+
+	static adjustContent(system, history, prompt, contextWindow, reservedTokens = 100) {
+		const targetTokens = contextWindow - reservedTokens;
+		let currentTokens = this.estimateTokens([
+			{role: 'system', content: system},
+			...history,
+			{role: 'user', content: prompt}
+		]);
+
+		while (currentTokens > targetTokens) {
+			if (history.length > 1) {
+				// Remove the oldest message from history
+				history.shift();
+			} else if (system.length > 50) {
+				// Trim the system message
+				system = system.slice(0, -50);
+			} else if (prompt.length > 50) {
+				// Trim the prompt as a last resort
+				prompt = prompt.slice(0, -50);
+			} else {
+				break; // Can't reduce further
+			}
+
+			currentTokens = this.estimateTokens([
+				{role: 'system', content: system},
+				...history,
+				{role: 'user', content: prompt}
+			]);
+
+		}
+
+		return {system, history, prompt};
+	}
+
 	/**
 	 * Retrieves model information including the provider and maximum tokens.
 	 *
@@ -76,57 +115,45 @@ class AIService {
 	 * @throws {Error} - Throws an error if the model is not recognized.
 	 */
 	static solveModelInfo(model) {
-		let maxTokens = 4096;
+		const allModels = [...openAIModels, ...perplexityModels, ...groqModels, ...openRouterModels];
+		const modelInfo = allModels.find(m => m.name === model);
 
-		if (!openAIModels.includes(model) && !perplexityModels.includes(model) && !groqModels.includes(model) && !openRouterModels.includes(model)) {
-			throw new Error('Invalid model');
+		if (!modelInfo) {
+			throw new Error(`Model info not found for ${model}`);
 		}
 
-		if (groqModels.includes(model)) {
-			if (model === 'llama2-70b-4096' && maxTokens > 4096) maxTokens = 4096 - 2500;
-			if (model === 'llama3-8b-8192' && maxTokens > 8192) maxTokens = 8192 - 2500;
-			if (model === 'llama3-70b-8192' && maxTokens > 8192) maxTokens = 8192 - 2500;
+		let provider, authToken;
+
+		if (openAIModels.some(m => m.name === model)) {
+			provider = 'openai';
+			authToken = process.env.OPENAI_API_KEY;
+		} else if (perplexityModels.some(m => m.name === model)) {
+			provider = 'perplexity';
+			authToken = process.env.PERPLEXITY_API_KEY;
+		} else if (groqModels.some(m => m.name === model)) {
+			provider = 'groq';
+			authToken = process.env.GROQ_API_KEY;
+		} else if (openRouterModels.some(m => m.name === model)) {
+			provider = 'openrouter';
+			authToken = process.env.OPEN_ROUTER_KEY;
+
+		} else {
+			throw new Error(`Provider not found for model: ${model}`);
 		}
 
-		if (openAIModels.includes(model)) {
-			if (model === 'gpt-3.5-turbo-16k' && maxTokens > 16000) maxTokens = 16000;
-			if (model === 'gpt-3.5-turbo' && maxTokens > 4096) maxTokens = 4096;
-			if (model === 'gpt-4' && maxTokens > 4096) maxTokens = 4096;
-			if (model === 'gpt-4-turbo' && maxTokens > 4096) maxTokens = 4096;
-			if (model === 'gpt-4-1106-preview' && maxTokens > 4096) maxTokens = 4096;
-			if (model === 'gpt-4-turbo-preview' && maxTokens > 4096) maxTokens = 4096;
+		if (!authToken) {
+			throw new Error(`Auth token not found for provider: ${provider}`);
 		}
 
-		if (perplexityModels.includes(model)) {
-			if (model === 'sonar-small-chat' && maxTokens > 16384) maxTokens = 16384;
-			if (model === 'sonar-small-online' && maxTokens > 12000) maxTokens = 12000;
-			if (model === 'sonar-medium-chat' && maxTokens > 16384) maxTokens = 16384;
-			if (model === 'sonar-medium-online' && maxTokens > 12000) maxTokens = 12000;
-			if (model === 'llama-3-8b-instruct' && maxTokens > 8192) maxTokens = 8192;
-			if (model === 'llama-3-70b-instruct' && maxTokens > 8192) maxTokens = 8192;
-			if (model === 'codellama-70b-instruct' && maxTokens > 16384) maxTokens = 16384;
-			if (model === 'mistral-7b-instruct' && maxTokens > 16384) maxTokens = 16384;
-			if (model === 'mixtral-8x7b-instruct' && maxTokens > 16384) maxTokens = 16384;
-			if (model === 'mixtral-8x22b-instruct' && maxTokens > 16384) maxTokens = 16384;
-			if (model === 'llama-3-sonar-large-32k-online' && maxTokens > 4096) maxTokens = 4096;
-			if (model === 'llama-3-sonar-small-32k-online' && maxTokens > 4096) maxTokens = 4096;
-		}
+		// Use the contextWindow from the modelInfo, or set a default if not specified
+		const contextWindow = modelInfo.contextWindow || 4096;  // Default to 4096 if not specified
 
-		if (openRouterModels.includes(model)) {
-			if (model === 'burrito-8x7b' && maxTokens > 16384) maxTokens = 16384;
-			if (model === 'google/gemma-2-9b-it:free' && maxTokens > 2046) maxTokens = 2046;
-			if (model === 'mistralai/mistral-7b-instruct:free' && maxTokens > 2046) maxTokens = 2046;
-			if (model === 'google/gemini-pro' && maxTokens > 2046) maxTokens = 2046;
-		}
-
-		let provider;
-
-		if (openAIModels.includes(model)) provider = 'openai';
-		if (perplexityModels.includes(model)) provider = 'perplexity';
-		if (groqModels.includes(model)) provider = 'groq';
-		if (openRouterModels.includes(model)) provider = 'openrouter';
-
-		return {maxTokens, provider};
+		return {
+			...modelInfo,
+			provider,
+			authToken,
+			contextWindow
+		};
 	}
 
 	/**
@@ -408,7 +435,7 @@ class AIService {
 			output_format: 'jpg',
 		};
 
-		const output = await replicate.run('black-forest-labs/flux-schnell', { input });
+		const output = await replicate.run('black-forest-labs/flux-schnell', {input});
 		const url = output[0];
 
 		// create image in database

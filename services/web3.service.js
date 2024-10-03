@@ -31,11 +31,9 @@ class Web3Service {
     );
 
     static async getStakedBalance() {
-        console.log("Fetching total staked Burrito balance...");
         try {
             const stakedBalance = await Web3Service.burritoToken.balanceOf(Web3Service.STAKING_CONTRACT_ADDRESS);
             const formattedBalance = ethers.utils.formatUnits(stakedBalance, 18);
-            console.log("Total staked Burrito balance:", formattedBalance);
             return formattedBalance;
         } catch (error) {
             console.error("Error fetching staked balance:", error);
@@ -44,7 +42,6 @@ class Web3Service {
     }
 
     static async getStake(userAddress) {
-        console.log(`Fetching stake details for user ${userAddress}...`);
         try {
             const stake = await Web3Service.stakingContract.currentStakes(userAddress);
             const formattedStake = {
@@ -52,7 +49,6 @@ class Web3Service {
                 timestamp: new Date(stake.timestamp.toNumber() * 1000), // Convert to Date object
                 duration: stake.duration.toNumber() // Convert to number
             };
-            console.log(`Stake details for ${userAddress}:`, formattedStake);
             return formattedStake;
         } catch (error) {
             console.error(`Error fetching stake for ${userAddress}:`, error);
@@ -61,11 +57,9 @@ class Web3Service {
     }
 
     static async getMonthlyAPR() {
-        console.log("Fetching monthly APR...");
         try {
             const monthlyAPR = await Web3Service.stakingContract.monthlyAPR();
             const formattedAPR = ethers.utils.formatUnits(monthlyAPR, 18);
-            console.log("Monthly APR:", formattedAPR);
             return formattedAPR * 100;
         } catch (error) {
             console.error("Error fetching monthly APR:", error);
@@ -74,11 +68,9 @@ class Web3Service {
     }
 
     static async getAnnualAPR() {
-        console.log("Fetching annual APR...");
         try {
             const annualAPR = await Web3Service.stakingContract.annualAPR();
             const formattedAPR = ethers.utils.formatUnits(annualAPR, 18);
-            console.log("Annual APR:", formattedAPR);
             return formattedAPR * 100;
         } catch (error) {
             console.error("Error fetching annual APR:", error);
@@ -87,11 +79,9 @@ class Web3Service {
     }
 
     static async calculateReward(userAddress) {
-        console.log(`Calculating reward for user ${userAddress}...`);
         try {
             const reward = await Web3Service.stakingContract.calculateReward(userAddress);
             const formattedReward = ethers.utils.formatUnits(reward, 18);
-            console.log(`Reward for ${userAddress}:`, formattedReward);
             return formattedReward;
         } catch (error) {
             console.error(`Error calculating reward for ${userAddress}:`, error);
@@ -100,39 +90,30 @@ class Web3Service {
     }
 
     static async buildStakeTransaction(amount, duration, signerAddress) {
-        console.log(`Starting buildStakeTransaction with amount: ${amount}, duration: ${duration}, signerAddress: ${signerAddress}`);
 
         // Convertir amount a string si no lo es ya
         const amountString = amount.toString();
-        console.log(`Amount as string: ${amountString}`);
 
         const amountToStake = ethers.utils.parseUnits(amountString, 18);
-        console.log(`Amount to stake in wei: ${amountToStake.toString()}`);
 
         // Allow the contract to spend user's Burrito tokens
         const allowance = await Web3Service.burritoToken.allowance(
             signerAddress,
             Web3Service.STAKING_CONTRACT_ADDRESS
         );
-        console.log(`Current allowance: ${allowance.toString()}`);
-        console.log('Populating stake transaction...');
         const populatedTx = await Web3Service.stakingContract.populateTransaction.stake(
             amountToStake,
             duration,
             {gasLimit: 3000000} // Adjust gas limit as needed
         );
-        console.log('Stake transaction populated', populatedTx);
 
         return populatedTx;
     }
 
     static async buildApprovalTransaction(amount, spenderAddress, signerAddress) {
-        console.log(`Starting buildApprovalTransaction with amount: ${amount}, spenderAddress: ${spenderAddress}, signerAddress: ${signerAddress}`);
         // convert to String all parameters
         const amountString = amount.toString();
-        console.log(`Amount as string: ${amountString}`);
         const amountToApprove = ethers.utils.parseUnits(amountString, 18);
-        console.log(`Amount to approve in wei: ${amountToApprove.toString()}`);
         return await Web3Service.burritoToken.populateTransaction.approve(
             String(spenderAddress),
             String(amountToApprove),
@@ -146,7 +127,6 @@ class Web3Service {
     }
 
     static async buildRecordPaymentTransaction(avaxAmount, usdtAmount, signerAddress) {
-        console.log(`Building record payment transaction with AVAX: ${avaxAmount} and USDT: ${usdtAmount}`);
         try {
             const avaxValue = ethers.utils.parseEther(avaxAmount.toString());
             const usdtValue = ethers.utils.parseUnits(usdtAmount.toString(), 6);
@@ -156,7 +136,6 @@ class Web3Service {
                 usdtValue,
                 {value: avaxValue}
             );
-            console.log('Record payment transaction built', populatedTx);
             return populatedTx;
         } catch (error) {
             console.error("Error building record payment transaction:", error);
@@ -166,7 +145,6 @@ class Web3Service {
 
     // Nueva función para obtener el historial de pagos
     static async getPaymentHistory(userAddress) {
-        console.log(`Fetching payment history for user ${userAddress}...`);
         try {
             const history = await Web3Service.defiBilling.getPaymentHistory(userAddress);
             const formattedHistory = history.map(payment => ({
@@ -174,7 +152,6 @@ class Web3Service {
                 avaxAmount: ethers.utils.formatEther(payment.avaxAmount),
                 usdtAmount: ethers.utils.formatUnits(payment.usdtAmount, 6)
             }));
-            console.log(`Payment history for ${userAddress}:`, formattedHistory);
             return formattedHistory;
         } catch (error) {
             console.error(`Error fetching payment history for ${userAddress}:`, error);
@@ -184,7 +161,6 @@ class Web3Service {
 
     // Nueva función para retirar fondos
     static async buildWithdrawFundsTransaction(avaxAmount, usdtAmount, signerAddress) {
-        console.log(`Building withdraw funds transaction with AVAX: ${avaxAmount} and USDT: ${usdtAmount}`);
         try {
             const avaxValue = ethers.utils.parseEther(avaxAmount.toString());
             const usdtValue = ethers.utils.parseUnits(usdtAmount.toString(), 6);
@@ -193,7 +169,6 @@ class Web3Service {
                 avaxValue,
                 usdtValue
             );
-            console.log('Withdraw funds transaction built', populatedTx);
             return populatedTx;
         } catch (error) {
             console.error("Error building withdraw funds transaction:", error);
@@ -203,10 +178,8 @@ class Web3Service {
 
     // Nueva función para retirar todos los fondos
     static async buildWithdrawAllFundsTransaction(signerAddress) {
-        console.log("Building withdraw all funds transaction");
         try {
             const populatedTx = await Web3Service.defiBilling.populateTransaction.withdrawAllFunds();
-            console.log('Withdraw all funds transaction built', populatedTx);
             return populatedTx;
         } catch (error) {
             console.error("Error building withdraw all funds transaction:", error);
@@ -215,7 +188,6 @@ class Web3Service {
     }
 
     static async getActiveStakes(userAddress) {
-        console.log(`Fetching active stakes for user ${userAddress}...`);
         try {
             const stake = await Web3Service.stakingContract.currentStakes(userAddress);
             if (stake.timestamp > 0) {
@@ -240,7 +212,6 @@ class Web3Service {
     }
 
     static async getStakingHistory(userAddress) {
-        console.log(`Fetching staking history for user ${userAddress}...`);
         try {
             const stakeHistory = await Web3Service.stakingContract.getStakeHistory(userAddress);
             const history = await Promise.all(stakeHistory.map(async (stake) => {
@@ -263,7 +234,6 @@ class Web3Service {
     }
 
     static async getPaymentHistoryFromContract(userAddress) {
-        console.log(`Fetching payment history for user ${userAddress}...`);
         try {
             const history = await Web3Service.defiBilling.getPaymentHistory(userAddress);
             const formattedHistory = history.map(payment => ({
@@ -271,7 +241,6 @@ class Web3Service {
                 avaxAmount: ethers.utils.formatEther(payment.avaxAmount),
                 usdtAmount: ethers.utils.formatUnits(payment.usdtAmount, 6),
             }));
-            console.log(`Payment history for ${userAddress}:`, formattedHistory);
             return formattedHistory;
         } catch (error) {
             console.error(`Error fetching payment history for ${userAddress}:`, error);
@@ -286,8 +255,6 @@ class Web3Service {
                 wallet: userAddress,
             },
         });
-        console.log('Transactions to sync:', user);
-        console.log('User ID:', user.id);
         const paymentHistoryFromContract = await Web3Service.getPaymentHistoryFromContract(userAddress);
         const dbPaymentHistory = await prisma.balanceTransaction.findMany({
             where: {
@@ -307,8 +274,6 @@ class Web3Service {
             currency: contractTx.avaxAmount !== '0.0' ? 'AVAX' : 'USDT',
             timestamp: contractTx.timestamp * 1000,
         }));
-        console.log('Parsed transactions from DB:', parsedTransactionsFromDb);
-        console.log('Parsed transactions from contract:', parsedTransactionsFromContract);
         // Finding Transactions to Sync (Corrected)
         const txToSync = parsedTransactionsFromContract.filter(contractTx => {
             return !parsedTransactionsFromDb.some(dbTx =>
@@ -318,7 +283,6 @@ class Web3Service {
             );
         });
 
-        console.log('Transactions to sync:', txToSync);
 
         // Syncing Transactions, create entries for
         await prisma.balanceTransaction.createMany({
@@ -344,16 +308,13 @@ class Web3Service {
             if (txToSync[i].currency === 'AVAX') {
                 const avaxPrice = await Web3Service.getAvaxPrice();
                 const usdtAmount = txToSync[i].amount * avaxPrice;
-                console.log("AVAx entry converted to USDT: ", usdtAmount);
                 balanceToAdd += usdtAmount;
             }else{
-                console.log("USDT entry: ", txToSync[i].amount);
                 balanceToAdd += txToSync[i].amount;
             }
         }
 
         const totalBalance = parseFloat(userBalance.balance) + parseFloat(balanceToAdd);
-        console.log('Total balance:', totalBalance);
         await prisma.userBalance.update({
             where: {
                 id: userBalance.id,
@@ -363,7 +324,6 @@ class Web3Service {
             },
         });
 
-        console.log(`Payment history synchronized successfully for user: ${userAddress}`);
     } catch (error) {
         console.error(`Failed to synchronize payment history for user: ${userAddress}`, error);
     }

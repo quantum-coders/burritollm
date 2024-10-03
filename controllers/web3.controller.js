@@ -83,16 +83,13 @@ class Web3Controller {
         const {amount, duration} = req.body;
         const signerAddress = req.params.userAddress;
 
-        console.log("PARAMS", amount, duration, signerAddress)
         try {
             const stakeTx = await Web3Service.buildStakeTransaction(amount, duration, signerAddress);
-            console.log("STAKE TX", stakeTx)
             res.respond({
                 data: stakeTx,
                 message: "Stake transaction built successfully",
             });
         } catch (error) {
-            console.log("ERROR", error)
             res.respond({
                 error: error.message,
                 message: "Failed to build stake transaction",
@@ -120,20 +117,17 @@ class Web3Controller {
     static async buildApprovalTransaction(req, res) {
         const {amount, contract} = req.body;
         const signerAddress = req.params.userAddress;
-        console.log("PARAMS super controller", amount, contract, signerAddress)
         try {
             let spenderAddress;
             if (contract === 'staking') {
                 spenderAddress = Web3Service.STAKING_CONTRACT_ADDRESS;
             }
             const approveTx = await Web3Service.buildApprovalTransaction(amount, spenderAddress, signerAddress);
-            console.log("APPROVE TX", approveTx)
             res.respond({
                 data: approveTx,
                 message: "Approval transaction built successfully",
             });
         } catch (error) {
-            console.log("ERROR", error)
             res.respond({
                 error: error,
                 message: "Failed to build approval transaction",
@@ -179,7 +173,6 @@ class Web3Controller {
         const {avaxAmount, usdtAmount} = req.body;
         const signerAddress = req.params.userAddress;
 
-        console.log(`Building record payment transaction for user ${signerAddress} with AVAX: ${avaxAmount} and USDT: ${usdtAmount}`);
         try {
             const recordPaymentTx = await Web3Service.buildRecordPaymentTransaction(avaxAmount, usdtAmount, signerAddress);
             res.respond({
@@ -198,7 +191,6 @@ class Web3Controller {
     // Nueva función para obtener el historial de pagos
     static async getPaymentHistory(req, res) {
         const {userAddress} = req.params;
-        console.log(`Fetching payment history for user ${userAddress}...`);
         try {
             const paymentHistory = await Web3Service.getPaymentHistory(userAddress);
             res.respond({
@@ -219,7 +211,6 @@ class Web3Controller {
         const {avaxAmount, usdtAmount} = req.body;
         const signerAddress = req.params.userAddress;
 
-        console.log(`Building withdraw funds transaction for user ${signerAddress} with AVAX: ${avaxAmount} and USDT: ${usdtAmount}`);
         try {
             const withdrawFundsTx = await Web3Service.buildWithdrawFundsTransaction(avaxAmount, usdtAmount, signerAddress);
             res.respond({
@@ -238,7 +229,6 @@ class Web3Controller {
     // Nueva función para construir la transacción de retirar todos los fondos
     static async buildWithdrawAllFundsTransaction(req, res) {
         const signerAddress = req.params.userAddress;
-        console.log(`Building withdraw all funds transaction for user ${signerAddress}...`);
         try {
             const withdrawAllFundsTx = await Web3Service.buildWithdrawAllFundsTransaction(signerAddress);
             res.respond({
@@ -256,8 +246,6 @@ class Web3Controller {
 
     static async synchronizePaymentHistory(req, res) {
         const idUser = req.user.payload.id;
-        console.log("idUser is", idUser)
-        console.log(`Synchronizing payment history for user ${idUser}...`);
         const user = await prisma.user.findUnique({
             where: {
                 id: idUser,
@@ -266,7 +254,6 @@ class Web3Controller {
 
 
 
-        console.log(`Synchronizing payment history for user ${user.wallet}...`);
         try {
             await Web3Service.synchronizePaymentHistory(user.wallet)
 

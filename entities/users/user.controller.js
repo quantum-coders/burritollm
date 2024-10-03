@@ -40,7 +40,6 @@ class UserController extends PrimateController {
 					},
 				},
 			});
-			console.log(chats);
 			// if there is only one chat it is an object so convert to array
 			const chatsArray = Array.isArray(chats) ? chats : [ chats ];
 			const formattedChats = chatsArray.map(chat => ({
@@ -127,10 +126,10 @@ class UserController extends PrimateController {
 		try {
 			// Get user from req
 			const signedUser = req.user.payload;
-			console.log('SIGNED USER: ', signedUser);
+			console.warn('SIGNED USER: ', signedUser);
 
 			const user = await UserService.findById(signedUser.id);
-			console.log('USER: ', user);
+			console.warn('USER: ', user);
 
 			if(user) {
 				const balance = await prisma.userBalance.findFirst({
@@ -169,7 +168,6 @@ class UserController extends PrimateController {
 
 			const idUser = req.user.payload.id;
 
-			console.log('IDUSER: ', idUser);
 			const data = await UserService.createChat(idUser);
 
 			return res.respond({
@@ -246,7 +244,6 @@ class UserController extends PrimateController {
 				},
 			});
 
-			console.log('[CHAT]: ', chat);
 			// if metas is empty define {}
 			if(!chat.metas) {
 				chat.metas = {};
@@ -268,19 +265,14 @@ class UserController extends PrimateController {
 					)
 					: chat.created,
 			};
-			console.log('MODEL USAGES:', chat.modelUsages);
-			console.log('MESSAGES:', chat.messages);
 			let totalCost = 0;
 			for(const usage of chat.modelUsages) {
-				console.log('Current usage:', usage); // Verificar cada objeto `usage` individual
 				const tokens = parseFloat(usage.cost);
-				console.log('Parsed tokens:', tokens);
 				totalCost += tokens;
 			}
 
 			const tokensUsed = [];
 			for(const message of chat.messages) {
-				console.log('Current message:', message); // Verificar cada objeto `message` individual
 				let msgTotal = 0;
 				if(message.modelUsages && message.modelUsages.length > 0) {
 					for(const usage of message.modelUsages) {
