@@ -39,6 +39,7 @@ model Message {
   idUser     Int      @map("id_user")
   content    String   @db.LongText
   type       String   @default("user") @map("message_type")
+  idRequest  String?  @unique @default(cuid()) @map("id_request")
   responseTo Int?     @map("response_to")
   created    DateTime @default(now()) @map("created")
   modified   DateTime @default(now()) @map("modified")

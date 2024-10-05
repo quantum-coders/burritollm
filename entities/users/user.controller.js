@@ -301,41 +301,55 @@ class UserController extends PrimateController {
 
 	//updateChatPatch
 	static async updateChatPatch(req, res, next) {
-		try {
-			const { uid } = req.params;
-			const idUser = req.user.payload.id;
-			const updateData = req.body;
+    console.info('Iniciando updateChatPatch');
+    console.info('Parámetros recibidos:', { params: req.params, body: req.body });
 
-			// Verificar que el chat existe y pertenece al usuario
-			const chat = await prisma.chat.findFirst({
-				where: {
-					idUser: idUser,
-					uid: uid,
-				},
-			});
+    try {
+        const { uid } = req.params;
+        const idUser = req.user.payload.id;
+        const updateData = req.body;
 
-			if(!chat) {
-				return res.respond({
-					status: 404,
-					message: 'Chat not found',
-				});
-			}
+        console.info('Datos extraídos:', { uid, idUser, updateData });
 
-			// Actualizar solo los campos proporcionados
-			const updatedChat = await prisma.chat.update({
-				where: { id: chat.id },
-				data: updateData,
-			});
+        console.info('Buscando chat en la base de datos');
+        const chat = await prisma.chat.findFirst({
+            where: {
+                idUser: idUser,
+                uid: uid,
+            },
+        });
 
-			return res.respond({
-				data: updatedChat,
-				message: 'Chat updated successfully',
-			});
+        console.info('Resultado de la búsqueda del chat:', chat);
 
-		} catch(e) {
-			next(createError(400, e.message));
-		}
-	}
+        if(!chat) {
+            console.info('Chat no encontrado');
+            return res.respond({
+                status: 404,
+                message: 'Chat not found',
+            });
+        }
+
+        console.info('Chat encontrado, procediendo a actualizar');
+        console.info('Datos de actualización:', updateData);
+
+        const updatedChat = await prisma.chat.update({
+            where: { id: chat.id },
+            data: updateData,
+        });
+
+        console.info('Chat actualizado:', updatedChat);
+
+        console.info('Enviando respuesta exitosa');
+        return res.respond({
+            data: updatedChat,
+            message: 'Chat updated successfully',
+        });
+
+    } catch(e) {
+        console.error('Error en updateChatPatch:', e);
+        next(createError(400, e.message));
+    }
+}
 
 	static async deleteImage(req, res, next) {
 		try {

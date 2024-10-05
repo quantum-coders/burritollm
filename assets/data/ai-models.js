@@ -72,7 +72,8 @@ const groqModels = [
 ];
 
 const openRouterModels = [
-	{name: 'never-sleep/llama-3.1-sonar-small-128k-online', contextWindow: 2048},
+	{name: 'neversleep/llama-3-lumimaid-70b', contextWindow: 2048},
+	{name: 'neversleep/llama-3-lumimaid-8b', contextWindow: 2048},
 	{name: 'burrito-8x7b', contextWindow: 2048 }
 ];
 

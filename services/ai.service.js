@@ -15,20 +15,22 @@ class AIService {
 	 *
 	 * @param {Object} data - The data to send to the AI model.
 	 * @param {string} provider - The provider of the AI model.
+	 * @param  {AbortSignal} signal - The signal to cancel the request.
 	 * @returns {Promise<Object>} - A promise that resolves to the response from the AI model.
 	 * @throws {Error} - Throws an error if there is an issue with the request or the response.
 	 */
-	static async sendMessage(data, provider) {
+	static async sendMessage(data, provider, signal) {
 		const bearerToken = AIService.solveProviderAuth(provider);
 		const url = AIService.solveProviderUrl(provider);
 
 		/// console info the payload of the request
-		console.info('Payload:', data);
+		console.info('Request payload:', data);
 		return await axios.post(url, data, {
 			headers: {
 				'Content-Type': 'application/json',
 				Authorization: `Bearer ${bearerToken}`,
 			},
+			signal,
 			responseType: 'stream',
 		});
 	}
@@ -82,30 +84,62 @@ class AIService {
 			{role: 'user', content: prompt}
 		]);
 
+		console.info(`Starting adjustContent: currentTokens=${currentTokens}, targetTokens=${targetTokens}`);
+
+		let iteration = 0;
+		const maxIterations = 100; // Establecemos un máximo de iteraciones para evitar bucles infinitos
+
 		while (currentTokens > targetTokens) {
+			iteration++;
+			if (iteration > maxIterations) {
+				console.error('adjustContent: Max iterations reached, exiting loop to prevent infinite loop.');
+				break;
+			}
+
+			const tokensOver = currentTokens - targetTokens;
+			console.info(`Iteration ${iteration}: currentTokens=${currentTokens}, tokensOver=${tokensOver}, history length=${history.length}, system length=${system.length}, prompt length=${prompt.length}`);
+
+			// Calculamos el chunkSize dinámicamente
+			let chunkSize = Math.ceil(tokensOver * 0.5); // Tomamos el 50% de los tokens sobrantes como chunkSize
+
+			// Convertimos chunkSize a número de caracteres aproximado (asumiendo que un token es aproximadamente 4 caracteres)
+			const approxCharsPerToken = 4;
+			const charsToRemove = chunkSize * approxCharsPerToken;
+
 			if (history.length > 1) {
 				// Remove the oldest message from history
-				history.shift();
+				const removedMessage = history.shift();
+				console.info(`Removed oldest message from history: ${JSON.stringify(removedMessage)}`);
 			} else if (system.length > 50) {
 				// Trim the system message
-				system = system.slice(0, -50);
+				const trimLength = Math.min(charsToRemove, system.length - 50);
+				console.info(`Trimming system message by ${trimLength} characters.`);
+				system = system.slice(0, -trimLength);
 			} else if (prompt.length > 50) {
 				// Trim the prompt as a last resort
-				prompt = prompt.slice(0, -50);
+				const trimLength = Math.min(charsToRemove, prompt.length - 50);
+				console.info(`Trimming prompt by ${trimLength} characters.`);
+				prompt = prompt.slice(0, -trimLength);
 			} else {
+				console.info('Cannot reduce content further, breaking the loop.');
 				break; // Can't reduce further
 			}
 
+			// Recalculamos los tokens actuales después de los ajustes
 			currentTokens = this.estimateTokens([
 				{role: 'system', content: system},
 				...history,
 				{role: 'user', content: prompt}
 			]);
 
+			console.info(`After adjustment: currentTokens=${currentTokens}`);
 		}
+
+		console.info(`Finished adjustContent: currentTokens=${currentTokens}, targetTokens=${targetTokens}`);
 
 		return {system, history, prompt};
 	}
+
 
 	/**
 	 * Retrieves model information including the provider and maximum tokens.
@@ -229,6 +263,7 @@ class AIService {
 	 * Sends a chat completion request to an AI model.
 	 *
 	 * This function constructs a request with the given model, system message, prompt, and conversation history.
+	 * It adjusts the content to fit within the model's context window using `adjustContent`.
 	 * It sends the request to the appropriate provider's API and handles the response, including error handling.
 	 *
 	 * @param {string} model - The model to be used for generating the chat completion.
@@ -244,17 +279,23 @@ class AIService {
 		const providerUrl = AIService.solveProviderUrl(providerData.provider);
 		const auth = AIService.solveProviderAuth(providerData.provider);
 
-		const messages = [
-			{role: 'system', content: systemMessage},
-			...history,
-			{role: 'user', content: prompt || 'Hello'},
-		];
+		// Ajustar el contenido utilizando adjustContent
+		const adjustedContent = AIService.adjustContent(
+			systemMessage,
+			history,
+			prompt,
+			providerData.contextWindow
+		);
 
-		const adjustedHistory = AIService.adjustHistory(systemMessage, messages, prompt);
+		const messages = [
+			{role: 'system', content: adjustedContent.system},
+			...adjustedContent.history,
+			{role: 'user', content: adjustedContent.prompt || 'Hello'},
+		];
 
 		const requestBody = {
 			model,
-			messages: adjustedHistory.history,
+			messages: messages,
 			temperature: 0.5,
 			max_tokens: providerData.maxTokens,
 			top_p: 1,
@@ -277,16 +318,85 @@ class AIService {
 		};
 
 		try {
+			console.info("------------------------------------------>BODY: ", JSON.stringify(requestBody));
 			const response = await fetch(providerUrl, requestOptions);
 			if (!response.ok) {
 				const errorData = await response.json();
-				throw new Error(`API request failed with status ${response.status}: ${JSON.stringify(errorData)}`);
+				throw new Error(
+					`API request failed with status ${response.status}: ${JSON.stringify(errorData)}`
+				);
 			}
+			console.info('Response:', response);
 			return await response.json();
 		} catch (error) {
 			console.error('Error in sendChatCompletion:', error);
 			throw error;
 		}
+	}
+
+
+	/**
+	 * Creates a search query based on the user's prompt and conversation history.
+	 *
+	 * This function analyzes the conversation history and the user's prompt to generate an optimized search query
+	 * for web searches. It first checks if a web search is necessary and then creates a search query of less than 13 words.
+	 *
+	 * @param {Array} history - The conversation history to be sent to the AI service.
+	 * @param {string} prompt - The user's question or prompt that needs to be analyzed.
+	 * @param {string} [model='burrito-8x7b'] - The model to be used for the AI service (default is 'burrito-8x7b').
+	 * @returns {Promise<string>} - A promise that resolves to the generated search query or an empty string if a web search is not needed.
+	 */
+	static async createSearchQuery(history, prompt, model = 'burrito-8x7b') {
+		const historyAdjusted = history.map((msg) => {
+			return {
+				role: msg.role,
+				content: msg.content,
+			};
+		});
+
+		const systemMessage = 'Your only output is a search query for web with less than 13 words. Analyze the conversation and create as the only output an optimized big search query based on what the user is asking';
+
+		// Obtener información del modelo
+		const providerData = AIService.solveModelInfo(model);
+
+		// Ajustar el contenido utilizando adjustContent
+		const adjustedContent = AIService.adjustContent(
+			systemMessage,
+			historyAdjusted,
+			prompt + "\n\n\n search query is:",
+			providerData.contextWindow
+		);
+
+		// Verificar si se necesita búsqueda web
+		let webSearchNeeded;
+		try {
+			let webSearchNeededResult = await AIService.checkIfWebSearchNeeded(historyAdjusted, prompt, 'gpt-4');
+			console.info("Web search needed result: ", webSearchNeededResult);
+			if (
+				webSearchNeededResult.includes('1') ||
+				webSearchNeededResult.includes('True') ||
+				webSearchNeededResult.includes('true')
+			) {
+				webSearchNeeded = true;
+			} else {
+				webSearchNeeded = false;
+			}
+		} catch (e) {
+			console.log("ERROR: ", e);
+		}
+
+		if (!webSearchNeeded) {
+			console.info("-------------------------> NO WEB SEARCH NEEDED");
+			return "";
+		}
+
+		const response = await AIService.sendChatCompletion(
+			model,
+			adjustedContent.system,
+			adjustedContent.prompt,
+			adjustedContent.history
+		);
+		return response.choices[0].message.content;
 	}
 
 
@@ -306,8 +416,14 @@ class AIService {
 		if (type === 'deep') {
 			numResults = 30;
 		}
+		const startPublishedDate = new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString();
+		const endPublishedDate = new Date().toISOString();
+		console.info('Fecha de inicio:', startPublishedDate);
+		console.info('Fecha de fin:', endPublishedDate);
 		const response = await ExaService.search(query, {
 			type: 'neural',
+			startPublishedDate,
+			endPublishedDate,
 			useAutoprompt: true,
 			numResults: 10,
 			contents: {
@@ -348,63 +464,6 @@ class AIService {
 
 
 	/**
-	 * Creates a search query based on the user's prompt and conversation history.
-	 *
-	 * This function analyzes the conversation history and the user's prompt to generate an optimized search query
-	 * for web searches. It first checks if a web search is necessary and then creates a search query of less than 13 words.
-	 *
-	 * @param {Array} history - The conversation history to be sent to the AI service.
-	 * @param {string} prompt - The user's question or prompt that needs to be analyzed.
-	 * @param {string} [model='burrito-8x7b'] - The model to be used for the AI service (default is 'burrito-8x7b').
-	 * @returns {Promise<string>} - A promise that resolves to the generated search query or an empty string if a web search is not needed.
-	 */
-	static async createSearchQuery(history, prompt, model = 'burrito-8x7b') {
-		const historyAdjusted = history.map((msg) => {
-			return {
-				role: msg.role,
-				content: msg.content,
-			};
-		});
-
-		const checkAndAdjustHistory = AIService.adjustHistory(
-			'Your only output is a search query for web with less than 13 words. Analyze the conversation and create as the only output an optimized big search query based on what the user is asking',
-			historyAdjusted,
-			prompt + "\n\n\n search query is:"
-		);
-
-		let webSearchNeeded;
-		try {
-			let webSearchNeededResult = await AIService.checkIfWebSearchNeeded(historyAdjusted, prompt, model);
-			if (webSearchNeededResult.includes('1') || webSearchNeededResult.includes('True') || webSearchNeededResult.includes('true')) {
-				webSearchNeeded = true;
-			} else {
-				webSearchNeeded = false;
-			}
-		} catch (e) {
-			console.log("ERROR: ", e);
-		}
-
-		if (!webSearchNeeded) {
-			return "";
-		}
-
-		const messages = [
-			{role: 'system', content: checkAndAdjustHistory.system},
-			...checkAndAdjustHistory.history,
-			{role: 'user', content: checkAndAdjustHistory.prompt},
-		];
-
-		const response = await AIService.sendChatCompletion(
-			model,
-			checkAndAdjustHistory.system,
-			checkAndAdjustHistory.prompt,
-			checkAndAdjustHistory.history,
-		);
-		return response.choices[0].message.content;
-	}
-
-
-	/**
 	 * Checks if a web search is needed based on the user's prompt.
 	 *
 	 * This function analyzes the user's question and determines whether data retrieval from the web is required.
@@ -424,6 +483,7 @@ class AIService {
 			prompt + "\n\n\ WebSearchNeeded: ",
 			history,
 		);
+		console.info('Web search needed response:', response.choices[0].message.content);
 		return response.choices[0].message.content;
 	}
 
