@@ -49,5 +49,11 @@ router.post('/build-withdraw-all-funds-transaction/:userAddress', Web3Controller
 
 router.get('/synchronize-payment-history', auth, Web3Controller.synchronizePaymentHistory);
 
+// Nuevas rutas para StakingContractV5
+router.get('/staking-limits', Web3Controller.getStakingLimits);
+router.get('/contract-stats', Web3Controller.getContractStats);
+router.post('/build-emergency-withdraw-transaction/:userAddress', Web3Controller.buildEmergencyWithdrawTransaction);
+router.get('/contract-paused', Web3Controller.isContractPaused);
+router.get('/stakers', Web3Controller.getStakers);
 
 export { router };

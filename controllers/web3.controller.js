@@ -2,6 +2,7 @@ import Web3Service from "../services/web3.service.js";
 import {prisma} from "@thewebchimp/primate";
 
 class Web3Controller {
+    // Mantener los métodos existentes que no requieren cambios
     static async getStakedBalance(req, res) {
         try {
             const balance = await Web3Service.getStakedBalance();
@@ -97,11 +98,13 @@ class Web3Controller {
         }
     }
 
+    // Actualizar para incluir stakeIndex
     static async buildUnstakeTransaction(req, res) {
         const signerAddress = req.params.userAddress;
+        const {stakeIndex} = req.body;
 
         try {
-            const unstakeTx = await Web3Service.buildUnstakeTransaction(signerAddress);
+            const unstakeTx = await Web3Service.buildUnstakeTransaction(stakeIndex, signerAddress);
             res.respond({
                 data: unstakeTx,
                 message: "Unstake transaction built successfully",
@@ -135,7 +138,6 @@ class Web3Controller {
         }
     }
 
-    // Añadir el nuevo método en el controlador
     static async getActiveStakes(req, res) {
         const {userAddress} = req.params;
         try {
@@ -152,7 +154,6 @@ class Web3Controller {
         }
     }
 
-    // Añadir el nuevo método en el controlador
     static async getStakingHistory(req, res) {
         const {userAddress} = req.params;
         try {
@@ -169,6 +170,7 @@ class Web3Controller {
         }
     }
 
+    // Mantener los métodos de DeFi y pagos sin cambios
     static async buildRecordPaymentTransaction(req, res) {
         const {avaxAmount, usdtAmount} = req.body;
         const signerAddress = req.params.userAddress;
@@ -188,7 +190,6 @@ class Web3Controller {
         }
     }
 
-    // Nueva función para obtener el historial de pagos
     static async getPaymentHistory(req, res) {
         const {userAddress} = req.params;
         try {
@@ -206,7 +207,6 @@ class Web3Controller {
         }
     }
 
-    // Nueva función para construir la transacción de retirar fondos
     static async buildWithdrawFundsTransaction(req, res) {
         const {avaxAmount, usdtAmount} = req.body;
         const signerAddress = req.params.userAddress;
@@ -226,7 +226,6 @@ class Web3Controller {
         }
     }
 
-    // Nueva función para construir la transacción de retirar todos los fondos
     static async buildWithdrawAllFundsTransaction(req, res) {
         const signerAddress = req.params.userAddress;
         try {
@@ -252,19 +251,94 @@ class Web3Controller {
             },
         });
 
-
-
         try {
             await Web3Service.synchronizePaymentHistory(user.wallet)
-
-            res.status(200).json({
+            res.respond({
                 message: 'Payment history synchronized successfully',
             });
         } catch (error) {
-            res.status(500).json({
+            res.respond({
                 error: error.message,
                 message: 'Failed to synchronize payment history',
+            }, 500);
+        }
+    }
+
+    // Nuevos métodos para las funcionalidades adicionales del V5
+    static async getStakingLimits(req, res) {
+        try {
+            const limits = await Web3Service.getStakingLimits();
+            res.respond({
+                data: limits,
+                message: "Staking limits fetched successfully",
             });
+        } catch (error) {
+            res.respond({
+                error: error.message,
+                message: "Failed to fetch staking limits",
+            }, 500);
+        }
+    }
+
+    static async getContractStats(req, res) {
+        try {
+            const stats = await Web3Service.getContractStats();
+            res.respond({
+                data: stats,
+                message: "Contract stats fetched successfully",
+            });
+        } catch (error) {
+            res.respond({
+                error: error.message,
+                message: "Failed to fetch contract stats",
+            }, 500);
+        }
+    }
+
+    static async buildEmergencyWithdrawTransaction(req, res) {
+        const {stakeIndex} = req.body;
+        try {
+            const emergencyWithdrawTx = await Web3Service.buildEmergencyWithdrawTransaction(stakeIndex);
+            res.respond({
+                data: emergencyWithdrawTx,
+                message: "Emergency withdraw transaction built successfully",
+            });
+        } catch (error) {
+            res.respond({
+                error: error.message,
+                message: "Failed to build emergency withdraw transaction",
+            }, 500);
+        }
+    }
+
+    static async isContractPaused(req, res) {
+        try {
+            const isPaused = await Web3Service.isContractPaused();
+            res.respond({
+                data: isPaused,
+                message: "Contract pause status fetched successfully",
+            });
+        } catch (error) {
+            res.respond({
+                error: error.message,
+                message: "Failed to fetch contract pause status",
+            }, 500);
+        }
+    }
+
+    static async getStakers(req, res) {
+        const {startIndex = 0, count = 10} = req.query;
+        try {
+            const stakers = await Web3Service.getStakers(Number(startIndex), Number(count));
+            res.respond({
+                data: stakers,
+                message: "Stakers list fetched successfully",
+            });
+        } catch (error) {
+            res.respond({
+                error: error.message,
+                message: "Failed to fetch stakers list",
+            }, 500);
         }
     }
 }

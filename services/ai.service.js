@@ -334,7 +334,6 @@ class AIService {
 		}
 	}
 
-
 	/**
 	 * Creates a search query based on the user's prompt and conversation history.
 	 *
@@ -461,8 +460,6 @@ class AIService {
 		}
 		return {webSearch: chat?.metas?.webSearch?.enabled, chat: chat};
 	}
-
-
 	/**
 	 * Checks if a web search is needed based on the user's prompt.
 	 *
@@ -486,7 +483,6 @@ class AIService {
 		console.info('Web search needed response:', response.choices[0].message.content);
 		return response.choices[0].message.content;
 	}
-
 
 	static async createImage(prompt, idUser) {
 		const input = {

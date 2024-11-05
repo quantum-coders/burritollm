@@ -1,342 +1,451 @@
 import {ethers} from 'ethers';
 import BurritoToken from '../abis/BurritoToken.json' assert {type: 'json'};
-import StakingContractV3 from '../abis/StakingContractV3.json' assert {type: 'json'};
+import StakingContractV5 from '../abis/StakingContractV5.json' assert {type: 'json'};
 import DefiBillingV3 from '../abis/DefiBillingV3.json' assert {type: 'json'};
 import {prisma} from "@thewebchimp/primate";
 
 class Web3Service {
-    static BURRITO_TOKEN_ADDRESS = process.env.BURRITO_TOKEN_ADDRESS;
-    static STAKING_CONTRACT_ADDRESS = process.env.STAKING_CONTRACT_ADDRESS;
-    static USDT_TOKEN_ADDRESS = process.env.USDT_TOKEN_ADDRESS;
-    static DEFI_BILLING_ADDRESS = process.env.DEFI_BILLING_ADDRESS;
+	static BURRITO_TOKEN_ADDRESS = process.env.BURRITO_TOKEN_ADDRESS;
+	static STAKING_CONTRACT_ADDRESS = process.env.STAKING_CONTRACT_ADDRESS;
+	static USDT_TOKEN_ADDRESS = process.env.USDT_TOKEN_ADDRESS;
+	static DEFI_BILLING_ADDRESS = process.env.DEFI_BILLING_ADDRESS;
 
-    static provider = new ethers.providers.JsonRpcProvider(process.env.PROVIDER_URL);
+	static provider = new ethers.providers.JsonRpcProvider(process.env.PROVIDER_URL);
 
-    static stakingContract = new ethers.Contract(
-        Web3Service.STAKING_CONTRACT_ADDRESS,
-        StakingContractV3.abi,
-        Web3Service.provider
-    );
+	static stakingContract = new ethers.Contract(
+		Web3Service.STAKING_CONTRACT_ADDRESS,
+		StakingContractV5.abi,
+		Web3Service.provider
+	);
 
-    static burritoToken = new ethers.Contract(
-        Web3Service.BURRITO_TOKEN_ADDRESS,
-        BurritoToken.abi,
-        Web3Service.provider
-    );
+	static burritoToken = new ethers.Contract(
+		Web3Service.BURRITO_TOKEN_ADDRESS,
+		BurritoToken.abi,
+		Web3Service.provider
+	);
 
-    static defiBilling = new ethers.Contract(
-        Web3Service.DEFI_BILLING_ADDRESS,
-        DefiBillingV3.abi,
-        Web3Service.provider
-    );
+	static defiBilling = new ethers.Contract(
+		Web3Service.DEFI_BILLING_ADDRESS,
+		DefiBillingV3.abi,
+		Web3Service.provider
+	);
 
-    static async getStakedBalance() {
-        try {
-            const stakedBalance = await Web3Service.burritoToken.balanceOf(Web3Service.STAKING_CONTRACT_ADDRESS);
-            const formattedBalance = ethers.utils.formatUnits(stakedBalance, 18);
-            return formattedBalance;
-        } catch (error) {
-            console.error("Error fetching staked balance:", error);
-            throw error;
-        }
-    }
+	static async getStakedBalance() {
+		try {
+			const totalTvl = await Web3Service.stakingContract.getTotalTvl();
+			return ethers.utils.formatUnits(totalTvl, 18);
+		} catch (error) {
+			console.error("Error fetching staked balance:", error);
+			throw error;
+		}
+	}
 
-    static async getStake(userAddress) {
-        try {
-            const stake = await Web3Service.stakingContract.currentStakes(userAddress);
-            const formattedStake = {
-                amount: ethers.utils.formatUnits(stake.amount, 18),
-                timestamp: new Date(stake.timestamp.toNumber() * 1000), // Convert to Date object
-                duration: stake.duration.toNumber() // Convert to number
-            };
-            return formattedStake;
-        } catch (error) {
-            console.error(`Error fetching stake for ${userAddress}:`, error);
-            throw error;
-        }
-    }
+	static async getStake(userAddress) {
+		try {
+			const stakes = await Web3Service.stakingContract.getUserStakes(userAddress);
+			// Return the most recent active stake
+			const activeStake = stakes.find(stake =>
+				!stake.claimed &&
+				stake.timestamp.add(stake.duration).gt(ethers.BigNumber.from(Math.floor(Date.now() / 1000)))
+			);
 
-    static async getMonthlyAPR() {
-        try {
-            const monthlyAPR = await Web3Service.stakingContract.monthlyAPR();
-            const formattedAPR = ethers.utils.formatUnits(monthlyAPR, 18);
-            return formattedAPR * 100;
-        } catch (error) {
-            console.error("Error fetching monthly APR:", error);
-            throw error;
-        }
-    }
+			if (!activeStake) return null;
 
-    static async getAnnualAPR() {
-        try {
-            const annualAPR = await Web3Service.stakingContract.annualAPR();
-            const formattedAPR = ethers.utils.formatUnits(annualAPR, 18);
-            return formattedAPR * 100;
-        } catch (error) {
-            console.error("Error fetching annual APR:", error);
-            throw error;
-        }
-    }
+			return {
+				amount: ethers.utils.formatUnits(activeStake.amount, 18),
+				timestamp: new Date(activeStake.timestamp.toNumber() * 1000),
+				duration: activeStake.duration.toNumber() / 86400 // Convert seconds to days
+			};
+		} catch (error) {
+			console.error(`Error fetching stake for ${userAddress}:`, error);
+			throw error;
+		}
+	}
 
-    static async calculateReward(userAddress) {
-        try {
-            const reward = await Web3Service.stakingContract.calculateReward(userAddress);
-            const formattedReward = ethers.utils.formatUnits(reward, 18);
-            return formattedReward;
-        } catch (error) {
-            console.error(`Error calculating reward for ${userAddress}:`, error);
-            throw error;
-        }
-    }
+	static async getMonthlyAPR() {
+		try {
+			const monthlyAPR = await Web3Service.stakingContract.monthlyAPR();
+			const formattedAPR = ethers.utils.formatUnits(monthlyAPR, 18);
+			return formattedAPR * 100;
+		} catch (error) {
+			console.error("Error fetching monthly APR:", error);
+			throw error;
+		}
+	}
 
-    static async buildStakeTransaction(amount, duration, signerAddress) {
+	static async getAnnualAPR() {
+		try {
+			const annualAPR = await Web3Service.stakingContract.annualAPR();
+			const formattedAPR = ethers.utils.formatUnits(annualAPR, 18);
+			return formattedAPR * 100;
+		} catch (error) {
+			console.error("Error fetching annual APR:", error);
+			throw error;
+		}
+	}
 
-        // Convertir amount a string si no lo es ya
-        const amountString = amount.toString();
+	static async calculateReward(userAddress) {
+		try {
+			const stakes = await Web3Service.stakingContract.getUserStakes(userAddress);
+			let totalReward = ethers.BigNumber.from(0);
 
-        const amountToStake = ethers.utils.parseUnits(amountString, 18);
+			for (let i = 0; i < stakes.length; i++) {
+				if (!stakes[i].claimed) {
+					const reward = await Web3Service.stakingContract.calculateReward(userAddress, i);
+					totalReward = totalReward.add(reward);
+				}
+			}
 
-        // Allow the contract to spend user's Burrito tokens
-        const allowance = await Web3Service.burritoToken.allowance(
-            signerAddress,
-            Web3Service.STAKING_CONTRACT_ADDRESS
-        );
-        const populatedTx = await Web3Service.stakingContract.populateTransaction.stake(
-            amountToStake,
-            duration,
-            {gasLimit: 3000000} // Adjust gas limit as needed
-        );
+			return ethers.utils.formatUnits(totalReward, 18);
+		} catch (error) {
+			console.error(`Error calculating reward for ${userAddress}:`, error);
+			throw error;
+		}
+	}
 
-        return populatedTx;
-    }
+	static async buildStakeTransaction(amount, duration, signerAddress) {
+		const amountString = amount.toString();
+		const amountToStake = ethers.utils.parseUnits(amountString, 18);
+		const durationInSeconds = duration * 86400; // Convert days to seconds
 
-    static async buildApprovalTransaction(amount, spenderAddress, signerAddress) {
-        // convert to String all parameters
-        const amountString = amount.toString();
-        const amountToApprove = ethers.utils.parseUnits(amountString, 18);
-        return await Web3Service.burritoToken.populateTransaction.approve(
-            String(spenderAddress),
-            String(amountToApprove),
-        );
-    }
+		// Allow the contract to spend user's Burrito tokens
+		const allowance = await Web3Service.burritoToken.allowance(
+			signerAddress,
+			Web3Service.STAKING_CONTRACT_ADDRESS
+		);
 
-    static async buildUnstakeTransaction(signerAddress) {
-        return await Web3Service.stakingContract.populateTransaction.unstake(
-            {gasLimit: 3000000}
-        );
-    }
+		const populatedTx = await Web3Service.stakingContract.populateTransaction.stake(
+			amountToStake,
+			durationInSeconds,
+			{gasLimit: 3000000}
+		);
 
-    static async buildRecordPaymentTransaction(avaxAmount, usdtAmount, signerAddress) {
-        try {
-            const avaxValue = ethers.utils.parseEther(avaxAmount.toString());
-            const usdtValue = ethers.utils.parseUnits(usdtAmount.toString(), 6);
+		return populatedTx;
+	}
 
-            const populatedTx = await Web3Service.defiBilling.populateTransaction.recordPayment(
-                avaxValue,
-                usdtValue,
-                {value: avaxValue}
-            );
-            return populatedTx;
-        } catch (error) {
-            console.error("Error building record payment transaction:", error);
-            throw error;
-        }
-    }
+	static async buildApprovalTransaction(amount, spenderAddress, signerAddress) {
+		// convert to String all parameters
+		const amountString = amount.toString();
+		const amountToApprove = ethers.utils.parseUnits(amountString, 18);
+		return await Web3Service.burritoToken.populateTransaction.approve(
+			String(spenderAddress),
+			String(amountToApprove),
+		);
+	}
 
-    // Nueva función para obtener el historial de pagos
-    static async getPaymentHistory(userAddress) {
-        try {
-            const history = await Web3Service.defiBilling.getPaymentHistory(userAddress);
-            const formattedHistory = history.map(payment => ({
-                timestamp: new Date(payment.timestamp.toNumber() * 1000),
-                avaxAmount: ethers.utils.formatEther(payment.avaxAmount),
-                usdtAmount: ethers.utils.formatUnits(payment.usdtAmount, 6)
-            }));
-            return formattedHistory;
-        } catch (error) {
-            console.error(`Error fetching payment history for ${userAddress}:`, error);
-            throw error;
-        }
-    }
+	static async buildUnstakeTransaction(stakeIndex, signerAddress) {
+		return await Web3Service.stakingContract.populateTransaction.unstake(
+			stakeIndex,
+			{gasLimit: 3000000}
+		);
+	}
 
-    // Nueva función para retirar fondos
-    static async buildWithdrawFundsTransaction(avaxAmount, usdtAmount, signerAddress) {
-        try {
-            const avaxValue = ethers.utils.parseEther(avaxAmount.toString());
-            const usdtValue = ethers.utils.parseUnits(usdtAmount.toString(), 6);
+	static async buildRecordPaymentTransaction(avaxAmount, usdtAmount, signerAddress) {
+		try {
+			const avaxValue = ethers.utils.parseEther(avaxAmount.toString());
+			const usdtValue = ethers.utils.parseUnits(usdtAmount.toString(), 6);
 
-            const populatedTx = await Web3Service.defiBilling.populateTransaction.withdrawFunds(
-                avaxValue,
-                usdtValue
-            );
-            return populatedTx;
-        } catch (error) {
-            console.error("Error building withdraw funds transaction:", error);
-            throw error;
-        }
-    }
+			const populatedTx = await Web3Service.defiBilling.populateTransaction.recordPayment(
+				avaxValue,
+				usdtValue,
+				{value: avaxValue}
+			);
+			return populatedTx;
+		} catch (error) {
+			console.error("Error building record payment transaction:", error);
+			throw error;
+		}
+	}
 
-    // Nueva función para retirar todos los fondos
-    static async buildWithdrawAllFundsTransaction(signerAddress) {
-        try {
-            const populatedTx = await Web3Service.defiBilling.populateTransaction.withdrawAllFunds();
-            return populatedTx;
-        } catch (error) {
-            console.error("Error building withdraw all funds transaction:", error);
-            throw error;
-        }
-    }
+	static async getPaymentHistory(userAddress) {
+		try {
+			const history = await Web3Service.defiBilling.getPaymentHistory(userAddress);
+			const formattedHistory = history.map(payment => ({
+				timestamp: new Date(payment.timestamp.toNumber() * 1000),
+				avaxAmount: ethers.utils.formatEther(payment.avaxAmount),
+				usdtAmount: ethers.utils.formatUnits(payment.usdtAmount, 6)
+			}));
+			return formattedHistory;
+		} catch (error) {
+			console.error(`Error fetching payment history for ${userAddress}:`, error);
+			throw error;
+		}
+	}
 
-    static async getActiveStakes(userAddress) {
-        try {
-            const stake = await Web3Service.stakingContract.currentStakes(userAddress);
-            if (stake.timestamp > 0) {
-                const currentTimestamp = Math.floor(Date.now() / 1000);
-                const isActive = currentTimestamp < (stake.timestamp.toNumber() + stake.duration.toNumber() * 86400);
+	static async buildWithdrawFundsTransaction(avaxAmount, usdtAmount, signerAddress) {
+		try {
+			const avaxValue = ethers.utils.parseEther(avaxAmount.toString());
+			const usdtValue = ethers.utils.parseUnits(usdtAmount.toString(), 6);
 
-                if (isActive) {
-                    const activeStake = {
-                        amount: ethers.utils.formatUnits(stake.amount, 18),
-                        startDate: new Date(stake.timestamp.toNumber() * 1000), // Convert to Date object
-                        endDate: new Date((stake.timestamp.toNumber() + stake.duration.toNumber() * 86400) * 1000), // Calculate end date
-                        rewards: await Web3Service.calculateReward(userAddress)
-                    };
-                    return [activeStake];
-                }
-            }
-            return [];
-        } catch (error) {
-            console.error(`Error fetching active stakes for ${userAddress}:`, error);
-            throw error;
-        }
-    }
+			const populatedTx = await Web3Service.defiBilling.populateTransaction.withdrawFunds(
+				avaxValue,
+				usdtValue
+			);
+			return populatedTx;
+		} catch (error) {
+			console.error("Error building withdraw funds transaction:", error);
+			throw error;
+		}
+	}
 
-    static async getStakingHistory(userAddress) {
-        try {
-            const stakeHistory = await Web3Service.stakingContract.getStakeHistory(userAddress);
-            const history = await Promise.all(stakeHistory.map(async (stake) => {
-                const startDate = new Date(stake.timestamp.toNumber() * 1000);
-                const endDate = new Date((stake.timestamp.toNumber() + stake.duration.toNumber() * 86400) * 1000);
-                const rewards = await Web3Service.calculateReward(userAddress);
-                return {
-                    amount: ethers.utils.formatUnits(stake.amount, 18),
-                    startDate,
-                    endDate,
-                    rewards,
-                    status: endDate <= new Date() ? 'Completed' : 'Active'
-                };
-            }));
-            return history;
-        } catch (error) {
-            console.error(`Error fetching staking history for ${userAddress}:`, error);
-            throw error;
-        }
-    }
+	static async buildWithdrawAllFundsTransaction(signerAddress) {
+		try {
+			const populatedTx = await Web3Service.defiBilling.populateTransaction.withdrawAllFunds();
+			return populatedTx;
+		} catch (error) {
+			console.error("Error building withdraw all funds transaction:", error);
+			throw error;
+		}
+	}
 
-    static async getPaymentHistoryFromContract(userAddress) {
-        try {
-            const history = await Web3Service.defiBilling.getPaymentHistory(userAddress);
-            const formattedHistory = history.map(payment => ({
-                timestamp: payment.timestamp.toNumber(),
-                avaxAmount: ethers.utils.formatEther(payment.avaxAmount),
-                usdtAmount: ethers.utils.formatUnits(payment.usdtAmount, 6),
-            }));
-            return formattedHistory;
-        } catch (error) {
-            console.error(`Error fetching payment history for ${userAddress}:`, error);
-            throw error;
-        }
-    }
+	static async getActiveStakes(userAddress) {
+		try {
+			const stakes = await Web3Service.stakingContract.getUserStakes(userAddress);
+			const currentTimestamp = Math.floor(Date.now() / 1000);
 
-    static async synchronizePaymentHistory(userAddress) {
-    try {
-        const user = await prisma.user.findFirst({
-            where: {
-                wallet: userAddress,
-            },
-        });
-        const paymentHistoryFromContract = await Web3Service.getPaymentHistoryFromContract(userAddress);
-        const dbPaymentHistory = await prisma.balanceTransaction.findMany({
-            where: {
-                idUserBalance: user.id,
-                type: 'crypto',
-            },
-        });
+			const activeStakes = [];
 
-        const parsedTransactionsFromDb = dbPaymentHistory.map(tx => ({
-            amount:  parseFloat(tx.amount),
-            currency: tx.currency,
-            timestamp: Number(tx.timestamp)
-        }));
+			for (let i = 0; i < stakes.length; i++) {
+				const stake = stakes[i];
+				if (!stake.claimed &&
+					stake.timestamp.add(stake.duration).gt(ethers.BigNumber.from(currentTimestamp))) {
+					const reward = await Web3Service.stakingContract.calculateReward(userAddress, i);
 
-        const parsedTransactionsFromContract = paymentHistoryFromContract.map(contractTx => ({
-            amount: parseFloat(contractTx.avaxAmount !== '0.0' ? contractTx.avaxAmount : contractTx.usdtAmount),
-            currency: contractTx.avaxAmount !== '0.0' ? 'AVAX' : 'USDT',
-            timestamp: contractTx.timestamp * 1000,
-        }));
-        // Finding Transactions to Sync (Corrected)
-        const txToSync = parsedTransactionsFromContract.filter(contractTx => {
-            return !parsedTransactionsFromDb.some(dbTx =>
-                dbTx.amount == contractTx.amount &&
-                dbTx.currency == contractTx.currency &&
-                dbTx.timestamp === contractTx.timestamp
-            );
-        });
+					activeStakes.push({
+						index: i,
+						amount: ethers.utils.formatUnits(stake.amount, 18),
+						startDate: new Date(stake.timestamp.toNumber() * 1000),
+						endDate: new Date((stake.timestamp.toNumber() + stake.duration.toNumber()) * 1000),
+						rewards: ethers.utils.formatUnits(reward, 18),
+						rewardRate: ethers.utils.formatUnits(stake.rewardRate, 18)
+					});
+				}
+			}
 
+			return activeStakes;
+		} catch (error) {
+			console.error(`Error fetching active stakes for ${userAddress}:`, error);
+			throw error;
+		}
+	}
 
-        // Syncing Transactions, create entries for
-        await prisma.balanceTransaction.createMany({
-            data: txToSync.map(tx => ({
-                amount: tx.amount,
-                currency: tx.currency,
-                type: 'crypto',
-                timestamp: tx.timestamp,
-                idUserBalance: user.id,
-            })),
-        });
-        const userBalance = await prisma.userBalance.findFirst({
-            where: {
-                user: {
-                    wallet: userAddress,
-                },
-            },
-        });
+	static async getStakingHistory(userAddress) {
+		try {
+			const stakes = await Web3Service.stakingContract.getUserStakes(userAddress);
+			const currentTimestamp = Math.floor(Date.now() / 1000);
 
-        // iterate all transactions to sync and if is AVAX conver it to USDT
-        let balanceToAdd = 0.0
-        for (let i = 0; i < txToSync.length; i++) {
-            if (txToSync[i].currency === 'AVAX') {
-                const avaxPrice = await Web3Service.getAvaxPrice();
-                const usdtAmount = txToSync[i].amount * avaxPrice;
-                balanceToAdd += usdtAmount;
-            }else{
-                balanceToAdd += txToSync[i].amount;
-            }
-        }
+			const history = await Promise.all(stakes.map(async (stake, index) => {
+				const reward = stake.claimed ? "0" :
+					await Web3Service.stakingContract.calculateReward(userAddress, index);
 
-        const totalBalance = parseFloat(userBalance.balance) + parseFloat(balanceToAdd);
-        await prisma.userBalance.update({
-            where: {
-                id: userBalance.id,
-            },
-            data: {
-                balance: totalBalance,
-            },
-        });
+				const endTimestamp = stake.timestamp.toNumber() + stake.duration.toNumber();
+				let status;
+				if (stake.claimed) {
+					status = 'Completed';
+				} else if (currentTimestamp >= endTimestamp) {
+					status = 'Ready to Claim';
+				} else {
+					status = 'Active';
+				}
 
-    } catch (error) {
-        console.error(`Failed to synchronize payment history for user: ${userAddress}`, error);
-    }
-}
+				return {
+					index,
+					amount: ethers.utils.formatUnits(stake.amount, 18),
+					startDate: new Date(stake.timestamp.toNumber() * 1000),
+					endDate: new Date(endTimestamp * 1000),
+					rewards: ethers.utils.formatUnits(reward, 18),
+					status,
+					rewardRate: ethers.utils.formatUnits(stake.rewardRate, 18)
+				};
+			}));
 
+			return history;
+		} catch (error) {
+			console.error(`Error fetching staking history for ${userAddress}:`, error);
+			throw error;
+		}
+	}
 
-    static async getAvaxPrice() {
-        const avaxMainnetRpc = 'https://api.avax.network/ext/bc/C/rpc';
-        const provider = new ethers.providers.JsonRpcProvider(avaxMainnetRpc);
-        const priceFeed = new ethers.Contract('0x0A77230d17318075983913bC2145DB16C7366156', ['function latestRoundData() view returns (uint80, int256, uint256, uint256, uint80)'], provider);
-        const [roundId, price, startedAt, updatedAt, answeredInRound] = await priceFeed.latestRoundData();
-        return price / 1e8
-    }
+	static async getPaymentHistoryFromContract(userAddress) {
+		try {
+			const history = await Web3Service.defiBilling.getPaymentHistory(userAddress);
+			const formattedHistory = history.map(payment => ({
+				timestamp: payment.timestamp.toNumber(),
+				avaxAmount: ethers.utils.formatEther(payment.avaxAmount),
+				usdtAmount: ethers.utils.formatUnits(payment.usdtAmount, 6),
+			}));
+			return formattedHistory;
+		} catch (error) {
+			console.error(`Error fetching payment history for ${userAddress}:`, error);
+			throw error;
+		}
+	}
+
+	static async synchronizePaymentHistory(userAddress) {
+		try {
+			const user = await prisma.user.findFirst({
+				where: {
+					wallet: userAddress,
+				},
+			});
+			const paymentHistoryFromContract = await Web3Service.getPaymentHistoryFromContract(userAddress);
+			const dbPaymentHistory = await prisma.balanceTransaction.findMany({
+				where: {
+					idUserBalance: user.id,
+					type: 'crypto',
+				},
+			});
+
+			const parsedTransactionsFromDb = dbPaymentHistory.map(tx => ({
+				amount: parseFloat(tx.amount),
+				currency: tx.currency,
+				timestamp: Number(tx.timestamp)
+			}));
+
+			const parsedTransactionsFromContract = paymentHistoryFromContract.map(contractTx => ({
+				amount: parseFloat(contractTx.avaxAmount !== '0.0' ? contractTx.avaxAmount : contractTx.usdtAmount),
+				currency: contractTx.avaxAmount !== '0.0' ? 'AVAX' : 'USDT',
+				timestamp: contractTx.timestamp * 1000,
+			}));
+
+			// Finding Transactions to Sync
+			const txToSync = parsedTransactionsFromContract.filter(contractTx => {
+				return !parsedTransactionsFromDb.some(dbTx =>
+					dbTx.amount == contractTx.amount &&
+					dbTx.currency == contractTx.currency &&
+					dbTx.timestamp === contractTx.timestamp
+				);
+			});
+
+			// Syncing Transactions
+			await prisma.balanceTransaction.createMany({
+				data: txToSync.map(tx => ({
+					amount: tx.amount,
+					currency: tx.currency,
+					type: 'crypto',
+					timestamp: tx.timestamp,
+					idUserBalance: user.id,
+				})),
+			});
+
+			const userBalance = await prisma.userBalance.findFirst({
+				where: {
+					user: {
+						wallet: userAddress,
+					},
+				},
+			});
+
+			// iterate all transactions to sync and if is AVAX convert it to USDT
+			let balanceToAdd = 0.0
+			for (let i = 0; i < txToSync.length; i++) {
+				if (txToSync[i].currency === 'AVAX') {
+					const avaxPrice = await Web3Service.getAvaxPrice();
+					const usdtAmount = txToSync[i].amount * avaxPrice;
+					balanceToAdd += usdtAmount;
+				} else {
+					balanceToAdd += txToSync[i].amount;
+				}
+			}
+
+			const totalBalance = parseFloat(userBalance.balance) + parseFloat(balanceToAdd);
+			await prisma.userBalance.update({
+				where: {
+					id: userBalance.id,
+				},
+				data: {
+					balance: totalBalance,
+				},
+			});
+
+		} catch (error) {
+			console.error(`Failed to synchronize payment history for user: ${userAddress}`, error);
+		}
+	}
+
+	static async getAvaxPrice() {
+		const avaxMainnetRpc = 'https://api.avax.network/ext/bc/C/rpc';
+		const provider = new ethers.providers.JsonRpcProvider(avaxMainnetRpc);
+		const priceFeed = new ethers.Contract('0x0A77230d17318075983913bC2145DB16C7366156', ['function latestRoundData() view returns (uint80, int256, uint256, uint256, uint80)'], provider);
+		const [roundId, price, startedAt, updatedAt, answeredInRound] = await priceFeed.latestRoundData();
+		return price / 1e8;
+		// Continúa el método getAvaxPrice()...
+	}
+
+	static async getStakingLimits() {
+		try {
+			const limits = await Web3Service.stakingContract.limits();
+			return {
+				maxDuration: limits.maxDuration.toNumber() / 86400, // Convert to days
+				minDuration: limits.minDuration.toNumber() / 86400,
+				maxStakeAmount: ethers.utils.formatUnits(limits.maxStakeAmount, 18),
+				maxStakesPerUser: limits.maxStakesPerUser.toNumber()
+			};
+		} catch (error) {
+			console.error("Error fetching staking limits:", error);
+			throw error;
+		}
+	}
+
+	static async getContractStats() {
+		try {
+			const [totalStaked, availableRewards, stakerCount, maxTotalStaked] = await Promise.all([
+				Web3Service.stakingContract.getTotalTvl(),
+				Web3Service.stakingContract.getAvailableRewards(),
+				Web3Service.stakingContract.getStakerCount(),
+				Web3Service.stakingContract.maxTotalStaked()
+			]);
+
+			return {
+				totalStaked: ethers.utils.formatUnits(totalStaked, 18),
+				availableRewards: ethers.utils.formatUnits(availableRewards, 18),
+				stakerCount: stakerCount.toNumber(),
+				maxTotalStaked: ethers.utils.formatUnits(maxTotalStaked, 18)
+			};
+		} catch (error) {
+			console.error("Error fetching contract stats:", error);
+			throw error;
+		}
+	}
+
+	static async buildEmergencyWithdrawTransaction(stakeIndex) {
+		try {
+			return await Web3Service.stakingContract.populateTransaction.emergencyWithdraw(
+				stakeIndex,
+				{gasLimit: 3000000}
+			);
+		} catch (error) {
+			console.error("Error building emergency withdraw transaction:", error);
+			throw error;
+		}
+	}
+
+	static async isContractPaused() {
+		try {
+			return await Web3Service.stakingContract.paused();
+		} catch (error) {
+			console.error("Error checking if contract is paused:", error);
+			throw error;
+		}
+	}
+
+	static async getStakers(startIndex = 0, count = 10) {
+		try {
+			const stakerCount = await Web3Service.stakingContract.getStakerCount();
+			const endIndex = Math.min(startIndex + count, stakerCount.toNumber());
+			const stakers = [];
+
+			for (let i = startIndex; i < endIndex; i++) {
+				const stakerAddress = await Web3Service.stakingContract.getStakerAtIndex(i);
+				stakers.push(stakerAddress);
+			}
+
+			return stakers;
+		} catch (error) {
+			console.error("Error fetching stakers:", error);
+			throw error;
+		}
+	}
 }
 
 export default Web3Service;
