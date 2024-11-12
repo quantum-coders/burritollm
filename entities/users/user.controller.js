@@ -1,6 +1,6 @@
 import createError from 'http-errors';
 import UserService from './user.service.js';
-import { jwt, PrimateController, PrimateService, prisma } from '@thewebchimp/primate';
+import {jwt, PrimateController, PrimateService, prisma} from '@thewebchimp/primate';
 
 class UserController extends PrimateController {
 
@@ -9,7 +9,7 @@ class UserController extends PrimateController {
 			const idUser = req.user.payload.id;
 
 			const chats = await prisma.chat.findMany({
-				where: { idUser },
+				where: {idUser},
 				select: {
 					id: true,
 					name: true,
@@ -41,7 +41,7 @@ class UserController extends PrimateController {
 				},
 			});
 			// if there is only one chat it is an object so convert to array
-			const chatsArray = Array.isArray(chats) ? chats : [ chats ];
+			const chatsArray = Array.isArray(chats) ? chats : [chats];
 			const formattedChats = chatsArray.map(chat => ({
 				...chat,
 				userName: chat.user.name,
@@ -56,7 +56,7 @@ class UserController extends PrimateController {
 				message: 'Chats found',
 			});
 
-		} catch(e) {
+		} catch (e) {
 			next(createError(404, e.message));
 		}
 	}
@@ -65,13 +65,13 @@ class UserController extends PrimateController {
 		try {
 			const idUser = req.user.payload.id;
 			const images = await prisma.image.findMany({
-				where: { idUser },
+				where: {idUser},
 			});
 			res.respond({
 				data: images,
 				message: 'Images found',
 			});
-		} catch(e) {
+		} catch (e) {
 			next(createError(404, e.message));
 		}
 
@@ -79,11 +79,11 @@ class UserController extends PrimateController {
 
 	static async authenticate(req, res, next) {
 		try {
-			const { wallet } = req.body;
+			const {wallet} = req.body;
 			let message = 'User authenticated successfully';
 
 			// check for valid wallet address with regex
-			if(!wallet || !/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
+			if (!wallet || !/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
 				return res.respond({
 					status: 400,
 					message: 'Error: Invalid wallet address',
@@ -92,7 +92,7 @@ class UserController extends PrimateController {
 
 			let user = await UserService.findByWallet(wallet);
 
-			if(!user) {
+			if (!user) {
 				user = await UserService.create({
 					wallet,
 					login: wallet,
@@ -108,10 +108,10 @@ class UserController extends PrimateController {
 
 			return res.respond({
 				data: user,
-				props: { token },
+				props: {token},
 				message,
 			});
-		} catch(e) {
+		} catch (e) {
 
 			console.log(e);
 
@@ -131,8 +131,8 @@ class UserController extends PrimateController {
 			const user = await UserService.findById(signedUser.id);
 			console.warn('USER: ', user);
 
-			if(user) {
-				const balance = await prisma.userBalance.findFirst({
+			if (user) {
+				let balance = await prisma.userBalance.findFirst({
 					where: {
 						idUser: user.id,
 					},
@@ -140,8 +140,8 @@ class UserController extends PrimateController {
 
 				console.warn('BALANCE: ', balance);
 				// si no tiene balance y no tiene ningun registro en la tabla de balance crea una entrada y ponle de balance 5.00 usd
-				if(!balance) {
-					await prisma.userBalance.create({
+				if (!balance) {
+					balance = await prisma.userBalance.create({
 						data: {
 							idUser: user.id,
 							balance: 1.00,
@@ -160,7 +160,7 @@ class UserController extends PrimateController {
 					message: 'User found',
 				});
 			}
-		} catch(e) {
+		} catch (e) {
 			next(createError(404, e.message));
 		}
 	};
@@ -177,21 +177,21 @@ class UserController extends PrimateController {
 				message: 'Chat created successfully',
 			});
 
-		} catch(e) {
+		} catch (e) {
 			next(createError(404, e.message));
 		}
 	}
 
 	static async createChatMessage(req, res, next) {
 		try {
-			const { uid } = req.params;
+			const {uid} = req.params;
 			const idUser = req.user.payload.id;
-			const { message } = req.body;
-			const { type } = req.body;
+			const {message} = req.body;
+			const {type} = req.body;
 
-			const chat = await PrimateService.findBy({ idUser, uid }, 'chat');
+			const chat = await PrimateService.findBy({idUser, uid}, 'chat');
 
-			if(!chat) {
+			if (!chat) {
 				return res.respond({
 					status: 404,
 					message: 'Chat not found',
@@ -204,7 +204,7 @@ class UserController extends PrimateController {
 				content: message,
 			};
 
-			if(type) {
+			if (type) {
 				data.type = type;
 			}
 
@@ -215,14 +215,14 @@ class UserController extends PrimateController {
 				message: 'Chat message created successfully',
 			});
 
-		} catch(e) {
+		} catch (e) {
 			next(createError(404, e.message));
 		}
 	}
 
 	static async getChat(req, res, next) {
 		try {
-			const { uid } = req.params;
+			const {uid} = req.params;
 			const idUser = req.user.payload.id;
 
 			const chat = await prisma.chat.findFirst({
@@ -247,10 +247,10 @@ class UserController extends PrimateController {
 			});
 
 			// if metas is empty define {}
-			if(!chat.metas) {
+			if (!chat.metas) {
 				chat.metas = {};
 			}
-			if(!chat) {
+			if (!chat) {
 				return res.respond({
 					status: 404,
 					message: 'Chat not found',
@@ -268,16 +268,16 @@ class UserController extends PrimateController {
 					: chat.created,
 			};
 			let totalCost = 0;
-			for(const usage of chat.modelUsages) {
+			for (const usage of chat.modelUsages) {
 				const tokens = parseFloat(usage.cost);
 				totalCost += tokens;
 			}
 
 			const tokensUsed = [];
-			for(const message of chat.messages) {
+			for (const message of chat.messages) {
 				let msgTotal = 0;
-				if(message.modelUsages && message.modelUsages.length > 0) {
-					for(const usage of message.modelUsages) {
+				if (message.modelUsages && message.modelUsages.length > 0) {
+					for (const usage of message.modelUsages) {
 						msgTotal += parseFloat(usage.tokensUsed);
 					}
 				}
@@ -296,73 +296,73 @@ class UserController extends PrimateController {
 				message: 'Chat found',
 			});
 
-		} catch(e) {
+		} catch (e) {
 			next(createError(404, e.message));
 		}
 	}
 
 	//updateChatPatch
 	static async updateChatPatch(req, res, next) {
-    console.info('Iniciando updateChatPatch');
-    console.info('Parámetros recibidos:', { params: req.params, body: req.body });
+		console.info('Iniciando updateChatPatch');
+		console.info('Parámetros recibidos:', {params: req.params, body: req.body});
 
-    try {
-        const { uid } = req.params;
-        const idUser = req.user.payload.id;
-        const updateData = req.body;
+		try {
+			const {uid} = req.params;
+			const idUser = req.user.payload.id;
+			const updateData = req.body;
 
-        console.info('Datos extraídos:', { uid, idUser, updateData });
+			console.info('Datos extraídos:', {uid, idUser, updateData});
 
-        console.info('Buscando chat en la base de datos');
-        const chat = await prisma.chat.findFirst({
-            where: {
-                idUser: idUser,
-                uid: uid,
-            },
-        });
+			console.info('Buscando chat en la base de datos');
+			const chat = await prisma.chat.findFirst({
+				where: {
+					idUser: idUser,
+					uid: uid,
+				},
+			});
 
-        console.info('Resultado de la búsqueda del chat:', chat);
+			console.info('Resultado de la búsqueda del chat:', chat);
 
-        if(!chat) {
-            console.info('Chat no encontrado');
-            return res.respond({
-                status: 404,
-                message: 'Chat not found',
-            });
-        }
+			if (!chat) {
+				console.info('Chat no encontrado');
+				return res.respond({
+					status: 404,
+					message: 'Chat not found',
+				});
+			}
 
-        console.info('Chat encontrado, procediendo a actualizar');
-        console.info('Datos de actualización:', updateData);
+			console.info('Chat encontrado, procediendo a actualizar');
+			console.info('Datos de actualización:', updateData);
 
-        const updatedChat = await prisma.chat.update({
-            where: { id: chat.id },
-            data: updateData,
-        });
+			const updatedChat = await prisma.chat.update({
+				where: {id: chat.id},
+				data: updateData,
+			});
 
-        console.info('Chat actualizado:', updatedChat);
+			console.info('Chat actualizado:', updatedChat);
 
-        console.info('Enviando respuesta exitosa');
-        return res.respond({
-            data: updatedChat,
-            message: 'Chat updated successfully',
-        });
+			console.info('Enviando respuesta exitosa');
+			return res.respond({
+				data: updatedChat,
+				message: 'Chat updated successfully',
+			});
 
-    } catch(e) {
-        console.error('Error en updateChatPatch:', e);
-        next(createError(400, e.message));
-    }
-}
+		} catch (e) {
+			console.error('Error en updateChatPatch:', e);
+			next(createError(400, e.message));
+		}
+	}
 
 	static async deleteImage(req, res, next) {
 		try {
 			const idUser = req.user.payload.id;
-			const { id } = req.params;
+			const {id} = req.params;
 
 			const image = await prisma.image.findFirst({
-				where: { id: parseInt(id), idUser: parseInt(idUser) },
+				where: {id: parseInt(id), idUser: parseInt(idUser)},
 			});
 
-			if(!image) {
+			if (!image) {
 				return res.respond({
 					status: 404,
 					message: 'Image not found',
@@ -370,14 +370,14 @@ class UserController extends PrimateController {
 			}
 
 			await prisma.image.delete({
-				where: { id: parseInt(id) },
+				where: {id: parseInt(id)},
 			});
 
 			return res.respond({
 				message: 'Image deleted successfully',
 			});
 
-		} catch(e) {
+		} catch (e) {
 			next(createError(404, e.message));
 		}
 	}
