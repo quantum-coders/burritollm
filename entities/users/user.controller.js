@@ -138,15 +138,17 @@ class UserController extends PrimateController {
 					},
 				});
 
+				console.warn('BALANCE: ', balance);
 				// si no tiene balance y no tiene ningun registro en la tabla de balance crea una entrada y ponle de balance 5.00 usd
 				if(!balance) {
 					await prisma.userBalance.create({
 						data: {
 							idUser: user.id,
-							balance: 5.00,
+							balance: 1.00,
 						},
 					});
 				}
+				console.warn('BALANCE after create: ', balance);
 				// delete password
 				delete user.password;
 				/// add the balance to the user object
