@@ -40,27 +40,50 @@ class Web3Service {
 		}
 	}
 
-	static async getStake(userAddress) {
-		try {
-			const stakes = await Web3Service.stakingContract.getUserStakes(userAddress);
-			// Return the most recent active stake
-			const activeStake = stakes.find(stake =>
-				!stake.claimed &&
-				stake.timestamp.add(stake.duration).gt(ethers.BigNumber.from(Math.floor(Date.now() / 1000)))
-			);
+static async getStake(userAddress) {
+    try {
+        const stakes = await Web3Service.stakingContract.getUserStakes(userAddress);
+        console.log(`Found ${stakes.length} total stakes for ${userAddress}`);
 
-			if (!activeStake) return null;
+        const currentTime = Math.floor(Date.now() / 1000);
+        console.log(`Current timestamp: ${currentTime}`);
 
-			return {
-				amount: ethers.utils.formatUnits(activeStake.amount, 18),
-				timestamp: new Date(activeStake.timestamp.toNumber() * 1000),
-				duration: activeStake.duration.toNumber() / 86400 // Convert seconds to days
-			};
-		} catch (error) {
-			console.error(`Error fetching stake for ${userAddress}:`, error);
-			throw error;
-		}
-	}
+        let totalAmount = ethers.BigNumber.from(0);
+        const activeStakes = stakes.filter(stake => {
+            const endTime = stake.timestamp.add(stake.duration).toNumber();
+            const isActive = !stake.claimed &&
+                           stake.timestamp.add(stake.duration).gt(ethers.BigNumber.from(currentTime));
+
+            console.log(`Stake details:
+                - Claimed: ${stake.claimed}
+                - Start: ${stake.timestamp.toNumber()}
+                - Duration: ${stake.duration.toNumber()}
+                - End: ${endTime}
+                - Amount: ${ethers.utils.formatUnits(stake.amount, 18)}
+            `);
+
+            if (isActive) {
+                totalAmount = totalAmount.add(stake.amount);
+            }
+
+            return isActive;
+        });
+
+        console.log(`Found ${activeStakes.length} active stakes`);
+
+        if (activeStakes.length === 0) return null;
+
+        return {
+            amount: ethers.utils.formatUnits(totalAmount, 18),
+            timestamp: new Date(activeStakes[0].timestamp.toNumber() * 1000),
+            duration: activeStakes[0].duration.toNumber() / 86400
+        };
+
+    } catch (error) {
+        console.error(`Error fetching stakes for ${userAddress}:`, error);
+        throw error;
+    }
+}
 
 	static async getMonthlyAPR() {
 		try {
