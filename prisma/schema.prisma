@@ -32,27 +32,6 @@ model User {
   @@map("user")
 }
 
-model Message {
-  id         Int      @id @default(autoincrement())
-  uid        String?  @unique @default(cuid())
-  idChat     Int      @map("id_chat")
-  idUser     Int      @map("id_user")
-  content    String   @db.LongText
-  type       String   @default("user") @map("message_type")
-  idRequest  String?  @unique @default(cuid()) @map("id_request")
-  responseTo Int?     @map("response_to")
-  created    DateTime @default(now()) @map("created")
-  modified   DateTime @default(now()) @map("modified")
-
-  responses     Message[]    @relation("responses")
-  parentMessage Message?     @relation("responses", fields: [responseTo], references: [id])
-  user          User         @relation(fields: [idUser], references: [id])
-  chat          Chat?        @relation(fields: [idChat], references: [id])
-  modelUsages   ModelUsage[]
-
-  @@map("message")
-}
-
 model Chat {
   id          Int      @id @default(autoincrement())
   uid         String   @unique @default(cuid())
@@ -66,10 +45,50 @@ model Chat {
   metas       Json?    @default("{}")
 
   user        User         @relation(fields: [idUser], references: [id])
-  messages    Message[]
-  modelUsages ModelUsage[]
+  messages    Message[]    @relation("ChatMessages")
+  modelUsages ModelUsage[] @relation("ChatModelUsages")
 
   @@map("chat")
+}
+
+model Message {
+  id         Int      @id @default(autoincrement())
+  uid        String?  @unique @default(cuid())
+  idChat     Int      @map("id_chat")
+  idUser     Int      @map("id_user")
+  content    String   @db.LongText
+  type       String   @default("user") @map("message_type")
+  idRequest  String?  @unique @default(cuid()) @map("id_request")
+  responseTo Int?     @map("response_to")
+  created    DateTime @default(now()) @map("created")
+  modified   DateTime @default(now()) @map("modified")
+
+  chat          Chat         @relation("ChatMessages", fields: [idChat], references: [id], onDelete: Cascade)
+  responses     Message[]    @relation("responses")
+  parentMessage Message?     @relation("responses", fields: [responseTo], references: [id])
+  user          User         @relation(fields: [idUser], references: [id])
+  modelUsages   ModelUsage[]
+
+  @@map("message")
+}
+
+model ModelUsage {
+  id            Int      @id @default(autoincrement())
+  idUser        Int      @map("id_user")
+  idModel       Int      @map("id_model")
+  idChat        Int      @map("id_chat")
+  idMessage     Int      @map("id_message")
+  tokensUsed    Int      @map("tokens_used")
+  cost          Decimal  @db.Decimal(10, 8)
+  balanceBefore Decimal  @default(0) @map("balance_before") @db.Decimal(10, 8)
+  created       DateTime @default(now())
+
+  user    User    @relation(fields: [idUser], references: [id])
+  aiModel AIModel @relation(fields: [idModel], references: [id])
+  chat    Chat    @relation("ChatModelUsages", fields: [idChat], references: [id], onDelete: Cascade)
+  message Message @relation(fields: [idMessage], references: [id])
+
+  @@map("model_usage")
 }
 
 model Attachment {
@@ -132,25 +151,6 @@ model UserBalance {
   transactions BalanceTransaction[]
 
   @@map("user_balance")
-}
-
-model ModelUsage {
-  id            Int      @id @default(autoincrement())
-  idUser        Int      @map("id_user")
-  idModel       Int      @map("id_model")
-  idChat        Int      @map("id_chat")
-  idMessage     Int      @map("id_message")
-  tokensUsed    Int      @map("tokens_used")
-  cost          Decimal  @db.Decimal(10, 8)
-  balanceBefore Decimal  @default(0) @map("balance_before") @db.Decimal(10, 8)
-  created       DateTime @default(now())
-
-  user    User    @relation(fields: [idUser], references: [id])
-  aiModel AIModel @relation(fields: [idModel], references: [id])
-  chat    Chat    @relation(fields: [idChat], references: [id])
-  message Message @relation(fields: [idMessage], references: [id])
-
-  @@map("model_usage")
 }
 
 model WaitList {

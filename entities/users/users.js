@@ -18,6 +18,7 @@ router.post('/me/chats/:uid/messages', auth, UserController.createChatMessage);
 
 router.get('/me/images', auth, UserController.getImages);
 router.delete('/me/images/:id', auth, UserController.deleteImage);
+router.delete('/me/chats/:id', auth, UserController.deleteChat);
 
 /*
 router.get('/me/chats', auth, UserController.chats);

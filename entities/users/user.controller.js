@@ -3,6 +3,75 @@ import UserService from './user.service.js';
 import {jwt, PrimateController, PrimateService, prisma} from '@thewebchimp/primate';
 
 class UserController extends PrimateController {
+	static async deleteChat(req, res, next) {
+		try {
+			const {id} = req.params;
+			const idUser = req.user.payload.id;
+
+			console.log('📥 Delete Request Details:', {id, idUser, time: new Date().toISOString()});
+
+			// Get chat with all its data before deletion
+			const existingChat = await prisma.chat.findUnique({
+				where: {id: parseInt(id, 10)},
+			});
+
+			console.log('📊 Chat Found:', {
+				exists: !!existingChat,
+				chatId: existingChat?.id,
+				messages: existingChat?.messages?.length || 0,
+				usages: existingChat?.modelUsages?.length || 0
+			});
+
+			if (!existingChat) {
+				console.log('❌ Chat Not Found:', {searchedId: id});
+				return res.respond({
+					status: 404,
+					message: 'Chat not found',
+				});
+			}
+
+			if (existingChat.idUser !== idUser) {
+				console.log('🚫 Wrong User:', {owner: existingChat.idUser, requester: idUser});
+				return res.respond({
+					message: 'Chat not found'
+				});
+			}
+
+			// Delete all related model usages first
+			await prisma.modelUsage.deleteMany({
+				where: {
+					OR: [
+						{idChat: existingChat.id},
+						{message: {idChat: existingChat.id}}
+					]
+				}
+			});
+
+			// Now safe to delete the chat (messages will cascade delete)
+			await prisma.chat.delete({
+				where: {id: existingChat.id}
+			});
+			
+
+			return res.respond({
+				message: 'Chat deleted successfully',
+				data: existingChat
+			});
+
+		} catch (error) {
+			console.error('🔥 Error:', {
+				name: error.name,
+				message: error.message,
+				code: error.code,
+				meta: error.meta
+			});
+
+			return res.respond({
+				message: 'Internal server error',
+				error: error.message
+			});
+		}
+	}
 
 	static async getChats(req, res, next) {
 		try {
