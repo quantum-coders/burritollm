@@ -559,7 +559,7 @@ class AIController {
 	}
 
 	/**
-	 * Checks if the user has a sufficient balance to proceed with a transaction.
+	 * Checks if the user has enough balances to proceed with a transaction.
 	 *
 	 * This function retrieves the user's balance from the database and checks if it is greater than zero.
 	 * If the balance is zero or less, or if there is an error retrieving the balance, it returns `false`.
