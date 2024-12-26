@@ -23,11 +23,15 @@ model User {
   created    DateTime @default(now()) @map("created")
   modified   DateTime @default(now()) @map("modified")
 
-  userBalance UserBalance?
-  messages    Message[]
-  chats       Chat[]
-  modelUsages ModelUsage[]
-  images      Image[]
+  userBalance            UserBalance?
+  messages               Message[]
+  chats                  Chat[]
+  modelUsages            ModelUsage[]
+  images                 Image[]
+  stakingAnalytics       StakingUserAnalytics? @relation(fields: [stakingUserAnalyticsId], references: [id])
+  web3Analytics          Web3UserAnalytics?    @relation(fields: [web3UserAnalyticsId], references: [id])
+  stakingUserAnalyticsId Int?
+  web3UserAnalyticsId    Int?
 
   @@map("user")
 }
@@ -174,4 +178,110 @@ model Image {
   user User @relation(fields: [idUser], references: [id])
 
   @@map("image")
+}
+
+model Web3Analytics {
+  id              Int      @id @default(autoincrement())
+  totalUsers      Int      @default(0) @map("total_users")
+  totalAvaxVolume Decimal  @map("total_avax_volume") @db.Decimal(20, 8)
+  totalUsdtVolume Decimal  @map("total_usdt_volume") @db.Decimal(20, 8)
+  timestamp       DateTime @default(now())
+
+  @@map("web3_analytics")
+}
+
+model Web3UserAnalytics {
+  id            Int      @id @default(autoincrement())
+  walletAddress String   @unique @map("wallet_address")
+  totalPayments Int      @default(0) @map("total_payments")
+  avaxVolume    Decimal  @map("avax_volume") @db.Decimal(20, 8)
+  usdtVolume    Decimal  @map("usdt_volume") @db.Decimal(20, 8)
+  firstPayment  DateTime @map("first_payment")
+  lastPayment   DateTime @map("last_payment")
+  User          User[]
+
+  @@map("web3_user_analytics")
+}
+
+model Web3Transaction {
+  id              Int      @id @default(autoincrement())
+  walletAddress   String   @map("wallet_address")
+  transactionHash String   @unique @map("transaction_hash")
+  avaxAmount      Decimal  @map("avax_amount") @db.Decimal(20, 8)
+  usdtAmount      Decimal  @map("usdt_amount") @db.Decimal(20, 8)
+  timestamp       DateTime @default(now()) @map("timestamp")
+  blockNumber     BigInt   @map("block_number")
+
+  @@map("web3_transaction")
+}
+
+// === MODELOS PARA STAKING ===
+model StakingAnalytics {
+  id                   Int      @id @default(autoincrement())
+  totalStakers         Int      @default(0) @map("total_stakers")
+  totalStaked          Decimal  @map("total_staked") @db.Decimal(20, 8)
+  totalRewardsPaid     Decimal  @map("total_rewards_paid") @db.Decimal(20, 8)
+  averageStakeDuration Int      @default(0) @map("average_stake_duration")
+  currentAPR           Decimal  @map("current_apr") @db.Decimal(10, 8)
+  timestamp            DateTime @default(now())
+
+  @@map("staking_analytics")
+}
+
+model StakingUserAnalytics {
+  id                   Int       @id @default(autoincrement())
+  walletAddress        String    @unique @map("wallet_address")
+  totalStakes          Int       @default(0) @map("total_stakes")
+  activeStakes         Int       @default(0) @map("active_stakes")
+  totalStaked          Decimal   @map("total_staked") @db.Decimal(20, 8)
+  currentlyStaked      Decimal   @map("currently_staked") @db.Decimal(20, 8)
+  totalRewardsEarned   Decimal   @map("total_rewards_earned") @db.Decimal(20, 8)
+  averageStakeDuration Int       @default(0) @map("average_stake_duration")
+  firstStake           DateTime? @map("first_stake")
+  lastStake            DateTime? @map("last_stake")
+  User                 User[]
+
+  @@map("staking_user_analytics")
+}
+
+model StakingTransaction {
+  id              Int      @id @default(autoincrement())
+  walletAddress   String   @map("wallet_address")
+  transactionHash String   @unique @map("transaction_hash")
+  type            String // 'stake' or 'unstake' or 'emergency_withdraw'
+  amount          Decimal  @db.Decimal(20, 8)
+  rewardAmount    Decimal? @map("reward_amount") @db.Decimal(20, 8)
+  duration        Int? // en días
+  apr             Decimal? @db.Decimal(10, 8)
+  timestamp       DateTime @default(now())
+  blockNumber     BigInt   @map("block_number")
+
+  @@map("staking_transaction")
+}
+
+model StakingSnapshot {
+  id               Int      @id @default(autoincrement())
+  timestamp        DateTime @default(now())
+  totalStaked      Decimal  @map("total_staked") @db.Decimal(20, 8)
+  totalStakers     Int      @default(0) @map("total_stakers")
+  monthlyAPR       Decimal  @map("monthly_apr") @db.Decimal(10, 8)
+  annualAPR        Decimal  @map("annual_apr") @db.Decimal(10, 8)
+  tvl              Decimal  @db.Decimal(20, 8)
+  availableRewards Decimal  @map("available_rewards") @db.Decimal(20, 8)
+
+  @@map("staking_snapshot")
+}
+
+model CombinedUserMetrics {
+  id                Int      @id @default(autoincrement())
+  walletAddress     String   @unique @map("wallet_address")
+  totalValueLocked  Decimal  @map("total_value_locked") @db.Decimal(20, 8)
+  stakingBalance    Decimal  @map("staking_balance") @db.Decimal(20, 8)
+  totalRewards      Decimal  @map("total_rewards") @db.Decimal(20, 8)
+  totalTransactions Int      @default(0) @map("total_transactions")
+  lastActivity      DateTime @default(now()) @map("last_activity")
+  riskScore         Int      @default(0) @map("risk_score")
+  userTier          String   @default("BASIC")
+
+  @@map("combined_user_metrics")
 }

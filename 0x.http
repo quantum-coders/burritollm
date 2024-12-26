@@ -1,0 +1,90 @@
+### Environment Variables
+@baseUrl = http://localhost:1337
+@userAddress = 0x1234567890abcdef1234567890abcdef12345678
+@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXlsb2FkIjp7ImlkIjozLCJ1aWQiOiJjbHpkaGVuaW8wMDAwN3pmbnQyZWprdmpsIiwibG9naW4iOiIweDNiMGIzMDkxOTMzOWZGYzYzMERlMmEzZjI1RTViMTk3NWI0MGNlQjciLCJlbWFpbCI6bnVsbCwiaWRFeHRlcm5hbCI6bnVsbCwibmljZW5hbWUiOiIiLCJwYXNzd29yZCI6IiIsInR5cGUiOiJVc2VyIiwic3RhdHVzIjoiQWN0aXZlIiwibGFuZ3VhZ2UiOiJlbiIsIndhbGxldCI6IjB4M2IwYjMwOTE5MzM5ZkZjNjMwRGUyYTNmMjVFNWIxOTc1YjQwY2VCNyIsIm1ldGFzIjp7fSwiY3JlYXRlZCI6IjIwMjQtMDgtMDNUMDE6NTU6MjUuMTk5WiIsIm1vZGlmaWVkIjoiMjAyNC0wOC0wM1QwMTo1NToyNS4xOTlaIn0sImlhdCI6MTczMzg3MjU0Nn0.399tHAkR1U7YKCi9Q6QO7OoIuHQQWFBHA-X2b6ynJjE
+
+### General Staking Statistics and Metrics
+
+### Get Staking Stats
+GET {{baseUrl}}/analytics/staking-stats
+Content-Type: application/json
+
+### Get Top Stakers
+GET {{baseUrl}}/analytics/top-stakers?limit=5
+Content-Type: application/json
+
+### Get Staking Metrics with Date Range
+GET {{baseUrl}}/analytics/staking-metrics?startDate=2024-01-01&endDate=2024-12-31
+Content-Type: application/json
+
+### User-specific Analytics
+
+### Get User Analytics
+GET {{baseUrl}}/analytics/user/{{userAddress}}
+Content-Type: application/json
+
+### Update User Analytics (Protected)
+POST {{baseUrl}}/analytics/user/{{userAddress}}/update
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+### Get User Transaction History
+GET {{baseUrl}}/analytics/user/{{userAddress}}/transactions?limit=10&offset=0&type=stake
+Content-Type: application/json
+
+### Snapshots Management
+
+### Get Staking Snapshots
+GET {{baseUrl}}/analytics/snapshots?limit=24&offset=0
+Content-Type: application/json
+
+### Create Manual Snapshot (Protected)
+POST {{baseUrl}}/analytics/snapshots/create
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+### Historical Data Processing
+
+### Process Historical Data (Protected)
+POST {{baseUrl}}/analytics/process-historical
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "fromBlock": 1000000,
+  "toBlock": 2000000
+}
+
+### Analytics Tracking Management
+
+### Start Analytics Tracking (Protected)
+POST {{baseUrl}}/analytics/start-tracking
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+### Dashboard Data
+
+### Get Analytics Dashboard
+GET {{baseUrl}}/analytics/dashboard
+Content-Type: application/json
+
+### Example Response Formats:
+
+### Success Response Example:
+# {
+#     "data": {
+#         "totalStaked": "1000000",
+#         "totalStakers": 150,
+#         "monthlyAPR": "12.5",
+#         "annualAPR": "150.0",
+#         "tvl": "1000000",
+#         "availableRewards": "50000"
+#     },
+#     "message": "Staking stats fetched successfully"
+# }
+
+### Error Response Example:
+# {
+#     "error": "Failed to fetch staking stats",
+#     "message": "Internal server error"
+# }
