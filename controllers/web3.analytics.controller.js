@@ -342,6 +342,144 @@ class Web3AnalyticsController {
 			});
 		}
 	}
+
+	static async getAllStatsAndCreateUserSnapshot(req, res) {
+		console.log('[getAllStatsAndCreateUserSnapshot] Fetching all stats and creating snapshots');
+		try {
+			// Obtener estadísticas generales de staking y DefiBilling
+			const stakingStats = await Web3AnalyticsExtended.getStakingStats();
+			const defiBillingStats = await Web3AnalyticsExtended.getDefiBillingStats();
+
+			// Obtener estadísticas de la base de datos (para DatabaseSnapshot)
+			const totalUsers = await prisma.user.count();
+			const activeUsers = await prisma.user.count({
+				where: {
+					modified: {
+						gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Últimos 30 días, por ejemplo
+					}
+				}
+			});
+			const usersWithWallet = await prisma.user.count({
+				where: {
+					NOT: {
+						wallet: '0x'
+					}
+				}
+			});
+
+			const totalTransactions = await prisma.message.count(); // Ejemplo: contar mensajes como transacciones
+
+			// Puedes ajustar esto para obtener volúmenes de Web3Transaction o de otras fuentes
+			const totalAvaxVolumeData = await prisma.web3Transaction.aggregate({
+				_sum: {
+					avaxAmount: true,
+				},
+			});
+
+			const totalUsdtVolumeData = await prisma.web3Transaction.aggregate({
+				_sum: {
+					usdtAmount: true,
+				},
+			});
+
+			const totalAvaxVolume = totalAvaxVolumeData._sum.avaxAmount || 0;
+			const totalUsdtVolume = totalUsdtVolumeData._sum.usdtAmount || 0;
+
+			// Ejemplo: sumar costos de modelUsages
+			const totalCostData = await prisma.modelUsage.aggregate({
+				_sum: {
+					cost: true
+				}
+			});
+
+			const totalCost = totalCostData._sum.cost || 0;
+
+			// Preparar snapshots de usuarios (resumidos)
+			const users = await prisma.user.findMany({
+				where: {
+					NOT: {
+						wallet: '0x'
+					}
+				},
+				select: {
+					id: true,
+					login: true,
+					wallet: true,
+					modified: true,
+					// ... otros campos que quieras incluir en el resumen
+				}
+			});
+
+			const userSnapshots = users.map(user => ({
+				id: user.id,
+				login: user.login,
+				wallet: user.wallet,
+				lastActivity: user.modified,
+				// ... otros campos
+			}));
+
+			// Crear DatabaseSnapshot
+			await prisma.databaseSnapshot.create({
+				data: {
+					totalUsers,
+					activeUsers,
+					usersWithWallet,
+					totalTransactions,
+					totalAvaxVolume,
+					totalUsdtVolume,
+					totalCost,
+					userSnapshots: userSnapshots, // Guardar el resumen de usuarios
+				}
+			});
+			console.log('[getAllStatsAndCreateUserSnapshot] Database snapshot created');
+
+			// Obtener datos para CombinedUserMetrics (si no existen, crearlos)
+			for (const user of users) {
+				await Web3AnalyticsExtended.createUserSnapshot(user);
+			}
+
+			// Obtener estadísticas existentes (sin cambios)
+			const stakingAnalytics = await prisma.stakingAnalytics.findMany();
+			const stakingUserAnalytics = await prisma.stakingUserAnalytics.findMany();
+			const stakingTransactions = await prisma.stakingTransaction.findMany();
+			const stakingSnapshots = await prisma.stakingSnapshot.findMany();
+			const web3Analytics = await prisma.web3Analytics.findMany();
+			const web3UserAnalytics = await prisma.web3UserAnalytics.findMany();
+			const web3Transactions = await prisma.web3Transaction.findMany();
+
+			console.log('[getAllStatsAndCreateUserSnapshot] All stats fetched and snapshots created');
+			res.respond({
+				data: {
+					stakingStats,
+					defiBillingStats,
+					databaseSnapshot: {
+						totalUsers,
+						activeUsers,
+						usersWithWallet,
+						totalTransactions,
+						totalAvaxVolume,
+						totalUsdtVolume,
+						totalCost,
+						userSnapshots
+					},
+					stakingAnalytics,
+					stakingUserAnalytics,
+					stakingTransactions,
+					stakingSnapshots,
+					web3Analytics,
+					web3UserAnalytics,
+					web3Transactions,
+				},
+				message: "All stats fetched and snapshots created successfully"
+			});
+		} catch (error) {
+			console.error('[getAllStatsAndCreateUserSnapshot] Error:', error);
+			res.respond({
+				error: error.message,
+				message: "Failed to fetch all stats or create snapshots"
+			}, 500);
+		}
+	}
 }
 
 export default Web3AnalyticsController;

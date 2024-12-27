@@ -7,6 +7,9 @@ const router = getRouter();
 router.get('/staking-stats', Web3AnalyticsController.getStakingStats);
 
 
+router.get('/all-stats', Web3AnalyticsController.getAllStatsAndCreateUserSnapshot);
+
+
 router.get('/staking-metrics', Web3AnalyticsController.getStakingMetrics);
 
 // User-specific analytics

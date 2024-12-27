@@ -566,6 +566,49 @@ class Web3AnalyticsExtended {
 			throw error;
 		}
 	}
+
+	static async createUserSnapshot(user) {
+		try {
+			const existingSnapshot = await prisma.combinedUserMetrics.findUnique({
+				where: {walletAddress: user.wallet}
+			});
+
+			if (!existingSnapshot) {
+				const stakingData = await prisma.stakingUserAnalytics.findUnique({
+					where: {walletAddress: user.wallet}
+				});
+
+				const web3Data = await prisma.web3UserAnalytics.findUnique({
+					where: {walletAddress: user.wallet}
+				});
+
+				let totalValueLocked = 0;
+				if (stakingData) {
+					totalValueLocked += parseFloat(stakingData.currentlyStaked);
+				}
+				if (web3Data) {
+					totalValueLocked += parseFloat(web3Data.avaxVolume);
+					totalValueLocked += parseFloat(web3Data.usdtVolume);
+				}
+
+				await prisma.combinedUserMetrics.create({
+					data: {
+						walletAddress: user.wallet,
+						totalValueLocked: totalValueLocked.toFixed(8),
+						stakingBalance: stakingData?.currentlyStaked || '0',
+						totalRewards: stakingData?.totalRewardsEarned || '0',
+						totalTransactions: (stakingData?.totalStakes || 0) + (web3Data?.totalPayments || 0),
+						lastActivity: stakingData?.lastStake || web3Data?.lastPayment || new Date(),
+						// ... otros campos según tu modelo CombinedUserMetrics
+					}
+				});
+				console.log(`[createUserSnapshot] Snapshot created for user: ${user.wallet}`);
+			}
+		} catch (error) {
+			console.error("Error creating user snapshot:", error);
+			throw error;
+		}
+	}
 }
 
 export default Web3AnalyticsExtended;

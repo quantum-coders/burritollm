@@ -285,3 +285,18 @@ model CombinedUserMetrics {
 
   @@map("combined_user_metrics")
 }
+
+model DatabaseSnapshot {
+  id                Int      @id @default(autoincrement())
+  timestamp         DateTime @default(now())
+  totalUsers        Int      @default(0)
+  activeUsers       Int      @default(0)
+  usersWithWallet   Int      @default(0)
+  totalTransactions Int      @default(0)
+  totalAvaxVolume   Decimal  @db.Decimal(20, 8)
+  totalUsdtVolume   Decimal  @db.Decimal(20, 8)
+  totalCost         Decimal  @db.Decimal(20, 8)
+  userSnapshots     Json?
+
+  @@map("database_snapshot")
+}
