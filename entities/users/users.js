@@ -12,6 +12,7 @@ router.get('/me', auth, UserController.me);
 
 router.post('/me/chats', auth, UserController.createChat);
 router.get('/me/chats', auth, UserController.getChats);
+router.get('/me/chats/search', auth, UserController.searchChats);
 router.get('/me/chats/:uid', auth, UserController.getChat);
 router.patch('/me/chats/:uid', auth, UserController.updateChatPatch);
 router.post('/me/chats/:uid/messages', auth, UserController.createChatMessage);
@@ -19,6 +20,7 @@ router.post('/me/chats/:uid/messages', auth, UserController.createChatMessage);
 router.get('/me/images', auth, UserController.getImages);
 router.delete('/me/images/:id', auth, UserController.deleteImage);
 router.delete('/me/chats/:id', auth, UserController.deleteChat);
+
 
 /*
 router.get('/me/chats', auth, UserController.chats);

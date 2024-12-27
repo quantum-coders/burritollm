@@ -51,7 +51,7 @@ class UserController extends PrimateController {
 			await prisma.chat.delete({
 				where: {id: existingChat.id}
 			});
-			
+
 
 			return res.respond({
 				message: 'Chat deleted successfully',
@@ -366,7 +366,10 @@ class UserController extends PrimateController {
 			});
 
 		} catch (e) {
-			next(createError(404, e.message));
+			res.respond({
+				status: 400,
+				message: e.message,
+			})
 		}
 	}
 
@@ -450,6 +453,110 @@ class UserController extends PrimateController {
 			next(createError(404, e.message));
 		}
 	}
+
+
+	static async searchChats(req, res, next) {
+		try {
+			console.log('[searchChats] Usuario actual:', req.user);
+			console.log('[searchChats] Query params:', req.query);
+
+			const idUser = req.user?.payload?.id;
+			const {q} = req.query;
+
+			console.log(`[searchChats] idUser: ${idUser}, buscando con query: "${q}"`);
+
+			const chats = await prisma.chat.findMany({
+				where: {
+					idUser,
+					OR: [
+						{
+							name: {
+								contains: q,
+							},
+						},
+						{
+							description: {
+								contains: q,
+							},
+						},
+						{
+							messages: {
+								some: {
+									content: {
+										contains: q,
+									},
+								},
+							},
+						},
+					],
+				},
+				select: {
+					id: true,
+					uid: true,
+					name: true,
+					description: true,
+					status: true,
+					created: true,
+					modified: true,
+					metas: true,
+					user: {
+						select: {
+							id: true,
+							nicename: true,
+							metas: true
+						}
+					},
+					messages: {
+						orderBy: {
+							modified: 'desc'
+						},
+						take: 1,
+						select: {
+							modified: true
+						}
+					},
+					_count: {
+						select: {
+							messages: true
+						}
+					}
+				}
+			});
+
+			if (!chats) {
+				console.log('[searchChats] Ningún chat encontrado');
+				return res.respond({
+					data: [],
+					message: 'No chats found'
+				});
+			}
+
+			// Parse JSON fields
+			const parsedChats = chats.map(chat => ({
+				...chat,
+				metas: chat.metas ? (typeof chat.metas === 'string' ? JSON.parse(chat.metas) : chat.metas) : {},
+				user: chat.user ? {
+					...chat.user,
+					metas: chat.user.metas ? (typeof chat.user.metas === 'string' ? JSON.parse(chat.user.metas) : chat.user.metas) : {}
+				} : null
+			}));
+
+			console.log(`[searchChats] Chats encontrados: ${parsedChats.length}`);
+
+			return res.respond({
+				data: parsedChats,
+				message: 'Chats filtered successfully'
+			});
+		} catch (e) {
+			console.error('[searchChats] Error:', e);
+			return res.respond({
+				status: 400,
+				message: e.message
+			});
+		}
+	}
+
+
 }
 
 export default UserController;
