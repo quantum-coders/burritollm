@@ -39,6 +39,64 @@ class Web3AnalyticsExtended {
 
 	// --- Funciones relacionadas con Eventos (Mejoradas) ---
 
+	static async getDefiBillingStats() {
+		try {
+			const [avaxBalance, usdtBalance] = await Promise.all([
+				this.provider.getBalance(this.DEFI_BILLING_ADDRESS),
+				this.defiBilling.usdtToken()
+					.then(usdtAddress => new ethers.Contract(usdtAddress, ['function balanceOf(address) view returns (uint256)'], this.provider))
+					.then(usdtContract => usdtContract.balanceOf(this.DEFI_BILLING_ADDRESS))
+			]);
+
+			return {
+				avaxBalance: ethers.utils.formatEther(avaxBalance),
+				usdtBalance: ethers.utils.formatUnits(usdtBalance, 6), // USDT suele tener 6 decimales
+				minDepositUsd: ethers.utils.formatUnits(await this.defiBilling.minDepositUsd(), 6)
+			};
+		} catch (error) {
+			console.error("Error fetching DefiBilling stats from contract:", error);
+			throw error;
+		}
+	}
+
+	static async getPaymentHistory(userAddress) {
+		try {
+			const paymentHistory = await this.defiBilling.getPaymentHistory(userAddress);
+			return paymentHistory.map(payment => ({
+				timestamp: new Date(payment.timestamp.toNumber() * 1000),
+				avaxAmount: ethers.utils.formatEther(payment.avaxAmount),
+				usdtAmount: ethers.utils.formatUnits(payment.usdtAmount, 6)
+			}));
+		} catch (error) {
+			console.error("Error fetching payment history from contract:", error);
+			throw error;
+		}
+	}
+
+	static async getDefiBillingUserStats(userAddress) {
+		try {
+			const paymentHistory = await this.getPaymentHistory(userAddress);
+
+			let totalUsdtPaid = 0;
+			let totalAvaxPaid = 0;
+
+			paymentHistory.forEach(payment => {
+				totalUsdtPaid += parseFloat(payment.usdtAmount);
+				totalAvaxPaid += parseFloat(payment.avaxAmount);
+			});
+
+			return {
+				totalUsdtPaid,
+				totalAvaxPaid,
+				numberOfPayments: paymentHistory.length,
+				lastPaymentDate: paymentHistory.length > 0 ? paymentHistory[paymentHistory.length - 1].timestamp : null
+			};
+		} catch (error) {
+			console.error("Error fetching DefiBilling user stats:", error);
+			throw error;
+		}
+	}
+
 	static async getAllStakers(limit = 10, offset = 0) {
 		try {
 			// Obtener el total de stakers (sin límite)

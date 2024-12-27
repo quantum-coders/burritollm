@@ -1,5 +1,5 @@
 import Web3AnalyticsController from "../controllers/web3.analytics.controller.js";
-import { auth, getRouter } from '@thewebchimp/primate';
+import {auth, getRouter} from '@thewebchimp/primate';
 
 const router = getRouter();
 
@@ -32,4 +32,11 @@ router.get('/all-stakers', Web3AnalyticsController.getAllStakers);
 // Dashboard data
 router.get('/dashboard', Web3AnalyticsController.getAnalyticsDashboard);
 
-export { router };
+router.get('/defibilling-stats', Web3AnalyticsController.getDefiBillingStats);
+
+router.get('/defibilling/user/:userAddress/stats', Web3AnalyticsController.getDefiBillingUserStats);
+
+router.get('/defibilling/user/:userAddress/payments', Web3AnalyticsController.getDefiBillingPaymentHistory);
+
+
+export {router};

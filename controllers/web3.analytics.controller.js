@@ -2,6 +2,61 @@ import {prisma} from "@thewebchimp/primate";
 import Web3AnalyticsExtended from "../services/web3.analytics.js";
 
 class Web3AnalyticsController {
+	static async getDefiBillingStats(req, res) {
+		try {
+			const stats = await Web3AnalyticsExtended.getDefiBillingStats();
+			console.log('[getDefiBillingStats] Response data:', stats);
+			res.respond({
+				data: stats,
+				message: "DefiBilling stats fetched successfully"
+			});
+		} catch (error) {
+			console.error('[getDefiBillingStats] Error:', error);
+			res.respond({
+				error: error.message,
+				message: "Failed to fetch DefiBilling stats"
+			});
+		}
+	}
+
+	static async getDefiBillingUserStats(req, res) {
+		const {userAddress} = req.params;
+		console.log('[getDefiBillingUserStats] Fetching for address:', userAddress);
+		try {
+			const userStats = await Web3AnalyticsExtended.getDefiBillingUserStats(userAddress);
+			console.log('[getDefiBillingUserStats] Response data:', userStats);
+			res.respond({
+				data: userStats,
+				message: "DefiBilling user stats fetched successfully"
+			});
+		} catch (error) {
+			console.error('[getDefiBillingUserStats] Error:', error);
+			res.respond({
+				error: error.message,
+				message: "Failed to fetch DefiBilling user stats"
+			});
+		}
+	}
+
+	static async getDefiBillingPaymentHistory(req, res) {
+		const {userAddress} = req.params;
+		console.log('[getDefiBillingPaymentHistory] Fetching for address:', userAddress);
+		try {
+			const paymentHistory = await Web3AnalyticsExtended.getPaymentHistory(userAddress);
+			console.log('[getDefiBillingPaymentHistory] Response data:', paymentHistory);
+			res.respond({
+				data: paymentHistory,
+				message: "DefiBilling payment history fetched successfully"
+			});
+		} catch (error) {
+			console.error('[getDefiBillingPaymentHistory] Error:', error);
+			res.respond({
+				error: error.message,
+				message: "Failed to fetch DefiBilling payment history"
+			});
+		}
+	}
+
 	static async getStakingStats(req, res) {
 		try {
 			const stats = await Web3AnalyticsExtended.getStakingStats();
@@ -15,35 +70,35 @@ class Web3AnalyticsController {
 			res.respond({
 				error: error.message,
 				message: "Failed to fetch staking stats"
-			}, 500);
+			});
 		}
 	}
 
 	static async getAllStakers(req, res) {
-  const { page = 1, limit = 10 } = req.query;
-  const offset = (page - 1) * limit;
+		const {page = 1, limit = 10} = req.query;
+		const offset = (page - 1) * limit;
 
-  try {
-    const { stakers, total } = await Web3AnalyticsExtended.getAllStakers(limit, offset);
-    const totalPages = Math.ceil(total / limit);
+		try {
+			const {stakers, total} = await Web3AnalyticsExtended.getAllStakers(limit, offset);
+			const totalPages = Math.ceil(total / limit);
 
-    console.log('[getAllStakers] Response data:', { stakers, total, totalPages });
+			console.log('[getAllStakers] Response data:', {stakers, total, totalPages});
 
-    res.respond({
-      data: {
-        stakers,
-        totalPages
-      },
-      message: "All stakers fetched successfully with pagination"
-    });
-  } catch (error) {
-    console.error('[getAllStakers] Error:', error);
-    res.respond({
-      error: error.message,
-      message: "Failed to fetch all stakers"
-    }, 500);
-  }
-}
+			res.respond({
+				data: {
+					stakers,
+					totalPages
+				},
+				message: "All stakers fetched successfully with pagination"
+			});
+		} catch (error) {
+			console.error('[getAllStakers] Error:', error);
+			res.respond({
+				error: error.message,
+				message: "Failed to fetch all stakers"
+			}, 500);
+		}
+	}
 
 	static async getStakingMetrics(req, res) {
 		const {startDate, endDate} = req.query;
@@ -63,7 +118,7 @@ class Web3AnalyticsController {
 			res.respond({
 				error: error.message,
 				message: "Failed to fetch staking metrics"
-			}, 500);
+			});
 		}
 	}
 
@@ -80,7 +135,7 @@ class Web3AnalyticsController {
 			res.respond({
 				error: error.message,
 				message: "Failed to start analytics tracking"
-			}, 500);
+			});
 		}
 	}
 
@@ -101,46 +156,46 @@ class Web3AnalyticsController {
 			res.respond({
 				error: error.message,
 				message: "Failed to process historical data"
-			}, 500);
+			});
 		}
 	}
 
 	static async getStakingUserAnalytics(req, res) {
-  const { userAddress } = req.params;
-  console.log('[getStakingUserAnalytics] Fetching for address:', userAddress);
-  try {
-    let userAnalytics = await prisma.stakingUserAnalytics.findUnique({
-      where: { walletAddress: userAddress }
-    });
+		const {userAddress} = req.params;
+		console.log('[getStakingUserAnalytics] Fetching for address:', userAddress);
+		try {
+			let userAnalytics = await prisma.stakingUserAnalytics.findUnique({
+				where: {walletAddress: userAddress}
+			});
 
-    if (!userAnalytics) {
-      console.log('[getStakingUserAnalytics] No analytics found for user, updating...');
-      await Web3AnalyticsExtended.updateStakingUserAnalytics(userAddress);
-      userAnalytics = await prisma.stakingUserAnalytics.findUnique({
-        where: { walletAddress: userAddress }
-      });
+			if (!userAnalytics) {
+				console.log('[getStakingUserAnalytics] No analytics found for user, updating...');
+				await Web3AnalyticsExtended.updateStakingUserAnalytics(userAddress);
+				userAnalytics = await prisma.stakingUserAnalytics.findUnique({
+					where: {walletAddress: userAddress}
+				});
 
-      if (!userAnalytics) {
-          console.log('[getStakingUserAnalytics] Still no analytics found for user');
-          return res.respond({
-             message: "No analytics found for this user, even after update attempt."
-          }, 404);
-      }
-    }
+				if (!userAnalytics) {
+					console.log('[getStakingUserAnalytics] Still no analytics found for user');
+					return res.respond({
+						message: "No analytics found for this user, even after update attempt."
+					}, 404);
+				}
+			}
 
-    console.log('[getStakingUserAnalytics] Response data:', userAnalytics);
-    res.respond({
-      data: userAnalytics,
-      message: "User analytics fetched successfully"
-    });
-  } catch (error) {
-    console.error('[getStakingUserAnalytics] Error:', error);
-    res.respond({
-      error: error.message,
-      message: "Failed to fetch user analytics"
-    }, 500);
-  }
-}
+			console.log('[getStakingUserAnalytics] Response data:', userAnalytics);
+			res.respond({
+				data: userAnalytics,
+				message: "User analytics fetched successfully"
+			});
+		} catch (error) {
+			console.error('[getStakingUserAnalytics] Error:', error);
+			res.respond({
+				error: error.message,
+				message: "Failed to fetch user analytics"
+			});
+		}
+	}
 
 	static async getStakingSnapshots(req, res) {
 		const {limit = 24, offset = 0} = req.query;
@@ -165,7 +220,7 @@ class Web3AnalyticsController {
 			res.respond({
 				error: error.message,
 				message: "Failed to fetch staking snapshots"
-			}, 500);
+			});
 		}
 	}
 
@@ -182,7 +237,7 @@ class Web3AnalyticsController {
 			res.respond({
 				error: error.message,
 				message: "Failed to create manual snapshot"
-			}, 500);
+			});
 		}
 	}
 
@@ -200,7 +255,7 @@ class Web3AnalyticsController {
 			res.respond({
 				error: error.message,
 				message: "Failed to update user analytics"
-			}, 500);
+			});
 		}
 	}
 
@@ -239,7 +294,7 @@ class Web3AnalyticsController {
 			res.respond({
 				error: error.message,
 				message: "Failed to fetch analytics dashboard data"
-			}, 500);
+			});
 		}
 	}
 
@@ -284,7 +339,7 @@ class Web3AnalyticsController {
 			res.respond({
 				error: error.message,
 				message: "Failed to fetch transaction history"
-			}, 500);
+			});
 		}
 	}
 }
