@@ -72,74 +72,6 @@ class AIService {
 		return url;
 	}
 
-	static estimateTokens(messages) {
-		return promptTokensEstimate({messages});
-	}
-
-	static adjustContent(system, history, prompt, contextWindow, reservedTokens = 100) {
-		const targetTokens = contextWindow - reservedTokens;
-		let currentTokens = this.estimateTokens([
-			{role: 'system', content: system},
-			...history,
-			{role: 'user', content: prompt}
-		]);
-
-		console.info(`Starting adjustContent: currentTokens=${currentTokens}, targetTokens=${targetTokens}`);
-
-		let iteration = 0;
-		const maxIterations = 100; // Establecemos un máximo de iteraciones para evitar bucles infinitos
-
-		while (currentTokens > targetTokens) {
-			iteration++;
-			if (iteration > maxIterations) {
-				console.error('adjustContent: Max iterations reached, exiting loop to prevent infinite loop.');
-				break;
-			}
-
-			const tokensOver = currentTokens - targetTokens;
-			console.info(`Iteration ${iteration}: currentTokens=${currentTokens}, tokensOver=${tokensOver}, history length=${history.length}, system length=${system.length}, prompt length=${prompt.length}`);
-
-			// Calculamos el chunkSize dinámicamente
-			let chunkSize = Math.ceil(tokensOver * 0.5); // Tomamos el 50% de los tokens sobrantes como chunkSize
-
-			// Convertimos chunkSize a número de caracteres aproximado (asumiendo que un token es aproximadamente 4 caracteres)
-			const approxCharsPerToken = 4;
-			const charsToRemove = chunkSize * approxCharsPerToken;
-
-			if (history.length > 1) {
-				// Remove the oldest message from history
-				const removedMessage = history.shift();
-				console.info(`Removed oldest message from history: ${JSON.stringify(removedMessage)}`);
-			} else if (system.length > 50) {
-				// Trim the system message
-				const trimLength = Math.min(charsToRemove, system.length - 50);
-				console.info(`Trimming system message by ${trimLength} characters.`);
-				system = system.slice(0, -trimLength);
-			} else if (prompt.length > 50) {
-				// Trim the prompt as a last resort
-				const trimLength = Math.min(charsToRemove, prompt.length - 50);
-				console.info(`Trimming prompt by ${trimLength} characters.`);
-				prompt = prompt.slice(0, -trimLength);
-			} else {
-				console.info('Cannot reduce content further, breaking the loop.');
-				break; // Can't reduce further
-			}
-
-			// Recalculamos los tokens actuales después de los ajustes
-			currentTokens = this.estimateTokens([
-				{role: 'system', content: system},
-				...history,
-				{role: 'user', content: prompt}
-			]);
-
-			console.info(`After adjustment: currentTokens=${currentTokens}`);
-		}
-
-		console.info(`Finished adjustContent: currentTokens=${currentTokens}, targetTokens=${targetTokens}`);
-
-		return {system, history, prompt};
-	}
-
 
 	/**
 	 * Retrieves model information including the provider and maximum tokens.
@@ -334,132 +266,7 @@ class AIService {
 		}
 	}
 
-	/**
-	 * Creates a search query based on the user's prompt and conversation history.
-	 *
-	 * This function analyzes the conversation history and the user's prompt to generate an optimized search query
-	 * for web searches. It first checks if a web search is necessary and then creates a search query of less than 13 words.
-	 *
-	 * @param {Array} history - The conversation history to be sent to the AI service.
-	 * @param {string} prompt - The user's question or prompt that needs to be analyzed.
-	 * @param {string} [model='burrito-8x7b'] - The model to be used for the AI service (default is 'burrito-8x7b').
-	 * @returns {Promise<string>} - A promise that resolves to the generated search query or an empty string if a web search is not needed.
-	 */
-	static async createSearchQuery(history, prompt, model = 'burrito-8x7b') {
-		const historyAdjusted = history.map((msg) => {
-			return {
-				role: msg.role,
-				content: msg.content,
-			};
-		});
 
-		const systemMessage = 'Your only output is a search query for web with less than 13 words. Analyze the conversation and create as the only output an optimized big search query based on what the user is asking';
-
-		// Obtener información del modelo
-		const providerData = AIService.solveModelInfo(model);
-
-		// Ajustar el contenido utilizando adjustContent
-		const adjustedContent = AIService.adjustContent(
-			systemMessage,
-			historyAdjusted,
-			prompt + "\n\n\n search query is:",
-			providerData.contextWindow
-		);
-
-		// Verificar si se necesita búsqueda web
-		let webSearchNeeded;
-		try {
-			let webSearchNeededResult = await AIService.checkIfWebSearchNeeded(historyAdjusted, prompt, 'gpt-4');
-			console.info("Web search needed result: ", webSearchNeededResult);
-			if (
-				webSearchNeededResult.includes('1') ||
-				webSearchNeededResult.includes('True') ||
-				webSearchNeededResult.includes('true')
-			) {
-				webSearchNeeded = true;
-			} else {
-				webSearchNeeded = false;
-			}
-		} catch (e) {
-			console.log("ERROR: ", e);
-		}
-
-		if (!webSearchNeeded) {
-			console.info("-------------------------> NO WEB SEARCH NEEDED");
-			return "";
-		}
-
-		const response = await AIService.sendChatCompletion(
-			model,
-			adjustedContent.system,
-			adjustedContent.prompt,
-			adjustedContent.history
-		);
-		return response.choices[0].message.content;
-	}
-
-
-	/**
-	 * Performs a Retrieval-Augmented Generation (RAG) search using the specified query.
-	 *
-	 * This function conducts a search using the ExaService with a specified query and type.
-	 * If the type is 'deep', it retrieves more results. The function concatenates the text from
-	 * all the search results into a single string, which is returned along with the original search response.
-	 *
-	 * @param {string} query - The search query to be used.
-	 * @param {string} [type='normal'] - The type of search to perform. Options are 'normal' or 'deep'. 'deep' retrieves more results.
-	 * @returns {Promise<Object>} - A promise that resolves to an object containing the search sources and the concatenated text context.
-	 */
-	static async RAGSearch(query, type = 'normal') {
-		let numResults = 10;
-		if (type === 'deep') {
-			numResults = 30;
-		}
-		const startPublishedDate = new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString();
-		const endPublishedDate = new Date().toISOString();
-		console.info('Fecha de inicio:', startPublishedDate);
-		console.info('Fecha de fin:', endPublishedDate);
-		const response = await ExaService.search(query, {
-			type: 'neural',
-			startPublishedDate,
-			endPublishedDate,
-			useAutoprompt: true,
-			numResults: 10,
-			contents: {
-				text: true,
-			},
-		});
-
-		let textConcatenated = '';
-		for (const result of response.results) {
-			textConcatenated += result.text + ' ';
-		}
-		return {sources: response, context: textConcatenated};
-	}
-
-
-	/**
-	 * Validates the configuration for web search in a specific chat.
-	 *
-	 * This function checks whether the given chat ID exists and whether web search is enabled in the chat's metadata.
-	 * If the chat ID is not provided or the chat cannot be found, it throws an error.
-	 *
-	 * @param {string} idChat - The unique identifier of the chat to validate.
-	 * @returns {Promise<Object>} - A promise that resolves to an object containing the web search configuration and the chat details.
-	 * @throws {Error} - Throws an error if the chat ID is not provided or if the chat is not found.
-	 */
-	static async validateChatWebSearchConfig(idChat) {
-		if (!idChat) {
-			throw new Error('Chat not found');
-		}
-		const chat = await prisma.chat.findUnique({
-			where: {id: idChat},
-		});
-		if (!chat) {
-			throw new Error('Chat not found');
-		}
-		return {webSearch: chat?.metas?.webSearch?.enabled, chat: chat};
-	}
 	/**
 	 * Checks if a web search is needed based on the user's prompt.
 	 *
@@ -502,6 +309,160 @@ class AIService {
 				idUser,
 			},
 		});
+	}
+
+
+	static async createSearchQuery(history, prompt, modelId) {
+		const model = await prisma.aIModel.findUnique({
+			where: {id: parseInt(modelId)},
+		});
+
+		if (!model || model.modelType !== 'chat') {
+			console.error('Modelo no encontrado o no es de tipo chat:', modelId);
+			return '';
+		}
+
+		const systemPrompt = `Given the conversation history and the user's last query, create a single search query to retrieve relevant information from a search engine.
+        The query should focus on extracting key information needed to answer the user's query effectively.
+        Do not add any additional text or explanation, only the search query is required.`;
+
+		const messages = [
+			{role: 'system', content: systemPrompt},
+			...history.map(h => ({role: h.role, content: h.content})),
+			{role: 'user', content: prompt},
+		];
+
+		try {
+			const data = {
+				model: model.openrouterId, // Usar el openrouterId del modelo
+				messages,
+				temperature: 0.7,
+				max_tokens: 60,
+				top_p: 1,
+				frequency_penalty: 0,
+				presence_penalty: 0,
+				stream: false,
+			};
+
+			const response = await axios.post(process.env.OPENROUTER_BASE_URL + '/chat/completions', data, {
+				headers: {
+					'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+					'Content-Type': 'application/json',
+				},
+			});
+
+			if (response.data && response.data.choices && response.data.choices.length > 0) {
+				return response.data.choices[0].message.content.trim();
+			} else {
+				console.error('Respuesta inesperada de la API:', response.data);
+				return '';
+			}
+		} catch (error) {
+			console.error('Error en createSearchQuery:', error);
+			return '';
+		}
+	}
+
+	// Modificar RAGSearch para usar modelos de la BD
+	static async RAGSearch(query, searchType = 'normal') {
+		try {
+			const response = await axios.post(`${process.env.RAG_BASE_URL}`, {
+				query,
+				searchType,
+			});
+
+			if (response.status === 200 && response.data) {
+				return response.data;
+			} else {
+				console.error('Error en la respuesta de RAGSearch:', response);
+				return {context: ''};
+			}
+		} catch (error) {
+			console.error('Error en RAGSearch:', error);
+			return {context: ''};
+		}
+	}
+
+	// Función para estimar tokens
+	static estimateTokens(messages) {
+		let totalTokens = 0;
+		for (const message of messages) {
+			if (typeof message.content === 'string') {
+				totalTokens += message.content.split(/\s+/).length;
+			}
+		}
+		return totalTokens;
+	}
+
+	// Modificar adjustContent para usar contextLength de la BD
+	static async adjustContent(system, history, prompt, contextWindow) {
+		if (!contextWindow) {
+			console.error('Longitud del contexto no especificada.');
+			return {system, history, prompt};
+		}
+		const promptTokens = this.estimateTokens([{content: prompt}]);
+
+		// Calcula maxOutputTokens como el 80% del contextWindow,
+		// o la diferencia entre contextWindow y promptTokens, lo que sea menor.
+		// Asegura que maxOutputTokens nunca sea negativo.
+		const maxOutputTokens = Math.max(0, Math.min(Math.floor(contextWindow * 0.8), contextWindow - promptTokens));
+
+		const safetyMargin = 50; // Un margen de seguridad
+		let availableTokens = contextWindow - promptTokens - maxOutputTokens - safetyMargin;
+
+		console.log(`Tokens disponibles para el historial y el sistema: ${availableTokens}`);
+		console.log(`Tokens estimados para el prompt: ${promptTokens}`);
+		console.log(`Tokens maximos para la salida: ${maxOutputTokens}`);
+
+		// Primero, reducir el system si es necesario
+		if (this.estimateTokens([{content: system}]) > availableTokens * 0.6) {
+			console.log("Reduciendo system...");
+			while (this.estimateTokens([{content: system}]) > availableTokens * 0.6 && system.length > 0) {
+				system = system.substring(0, system.length - 50); // Reducir de 50 en 50 caracteres
+			}
+			console.log(`System reducido a ${this.estimateTokens([{content: system}])} tokens`);
+			availableTokens -= this.estimateTokens([{content: system}]);
+		} else {
+			availableTokens -= this.estimateTokens([{content: system}]);
+		}
+
+		console.log(`Tokens disponibles para el historial después de ajustar el system: ${availableTokens}`);
+
+		let adjustedHistory = [];
+		for (let i = history.length - 1; i >= 0; i--) {
+			const message = history[i];
+			const messageTokens = this.estimateTokens([message]);
+
+			if (messageTokens <= availableTokens) {
+				adjustedHistory.unshift(message);
+				availableTokens -= messageTokens;
+			} else {
+				console.log(`Mensaje ${i} omitido por falta de tokens`);
+			}
+		}
+
+		console.log(`Historial ajustado a ${this.estimateTokens(adjustedHistory)} tokens`);
+
+		return {system, history: adjustedHistory, prompt};
+	}
+
+
+	// Modificar validateChatWebSearchConfig para obtener la configuración de la base de datos
+	static async validateChatWebSearchConfig(idChat) {
+		const chat = await prisma.chat.findUnique({
+			where: {id: parseInt(idChat)},
+			include: {selectedModel: true},
+		});
+
+		if (!chat) {
+			console.error('Chat no encontrado:', idChat);
+			return {webSearch: false};
+		}
+
+		const webSearchEnabled = chat.metas?.webSearch?.enabled || false;
+		const chatModel = chat.selectedModel?.openrouterId || 'neversleep/llama-3-lumimaid-8b';
+
+		return {webSearch: webSearchEnabled, chat, chatModel};
 	}
 }
 

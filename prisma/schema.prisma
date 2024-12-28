@@ -42,15 +42,17 @@ model Chat {
   name        String   @default("New Chat")
   description String?  @db.Text
   idUser      Int      @map("id_user")
+  idModel     Int?     @map("id_model") // Nuevo campo para el ID del modelo seleccionado
   system      String   @db.LongText
   status      String   @default("active")
   created     DateTime @default(now()) @map("created")
   modified    DateTime @default(now()) @map("modified")
   metas       Json?    @default("{}")
 
-  user        User         @relation(fields: [idUser], references: [id])
-  messages    Message[]    @relation("ChatMessages")
-  modelUsages ModelUsage[] @relation("ChatModelUsages")
+  user          User         @relation(fields: [idUser], references: [id])
+  messages      Message[]    @relation("ChatMessages")
+  modelUsages   ModelUsage[] @relation("ChatModelUsages")
+  selectedModel AIModel?     @relation(fields: [idModel], references: [id]) // Relación con el modelo seleccionado
 
   @@map("chat")
 }
@@ -112,19 +114,31 @@ model Attachment {
 }
 
 model AIModel {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  description String?  @db.Text
-  inputCost   Decimal  @map("input_cost") @db.Decimal(10, 2)
-  outputCost  Decimal  @map("output_cost") @db.Decimal(10, 2)
-  maxOutput   Int      @map("max_output")
-  latency     Decimal  @db.Decimal(5, 2)
-  throughput  Decimal  @db.Decimal(10, 2)
-  status      String   @default("active")
-  created     DateTime @default(now())
-  modified    DateTime @default(now()) @updatedAt
+  id                   Int      @id @default(autoincrement())
+  name                 String   @unique
+  description          String?  @db.Text
+  inputCost            Decimal  @map("input_cost") @db.Decimal(10, 2)
+  outputCost           Decimal  @map("output_cost") @db.Decimal(10, 2)
+  maxOutput            Int      @map("max_output")
+  latency              Decimal  @db.Decimal(5, 2)
+  throughput           Decimal  @db.Decimal(10, 2)
+  status               String   @default("active")
+  created              DateTime @default(now())
+  modified             DateTime @default(now()) @updatedAt
+  // Campos de OpenRouter
+  openrouterId         String?  @unique @map("openrouter_id")
+  openrouterInputCost  Decimal  @default(0) @map("openrouter_input_cost") @db.Decimal(10, 8)
+  openrouterOutputCost Decimal  @default(0) @map("openrouter_output_cost") @db.Decimal(10, 8)
+  contextLength        Int?     @map("context_length")
+  modelType            String?  @map("model_type")
+  modelArchitecture    Json?    @map("model_architecture")
+  // Nuevo campo para visibilidad en frontend
+  isVisible            Boolean  @default(true) @map("is_visible")
+  priority             Int      @default(0) // Para ordenar modelos en el frontend
+  isFeatured           Boolean  @default(false) @map("is_featured")
 
   modelUsages ModelUsage[]
+  Chat        Chat[]
 
   @@map("ai_model")
 }
