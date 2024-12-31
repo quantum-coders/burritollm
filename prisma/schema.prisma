@@ -117,14 +117,15 @@ model AIModel {
   id                   Int      @id @default(autoincrement())
   name                 String   @unique
   description          String?  @db.Text
-  inputCost            Decimal  @map("input_cost") @db.Decimal(10, 2)
-  outputCost           Decimal  @map("output_cost") @db.Decimal(10, 2)
+  inputCost            Decimal  @map("input_cost") @db.Decimal(10, 8)
+  outputCost           Decimal  @map("output_cost") @db.Decimal(10, 8)
   maxOutput            Int      @map("max_output")
   latency              Decimal  @db.Decimal(5, 2)
   throughput           Decimal  @db.Decimal(10, 2)
   status               String   @default("active")
   created              DateTime @default(now())
   modified             DateTime @default(now()) @updatedAt
+  sandbox              Boolean  @default(false)
   // Campos de OpenRouter
   openrouterId         String?  @unique @map("openrouter_id")
   openrouterInputCost  Decimal  @default(0) @map("openrouter_input_cost") @db.Decimal(10, 8)
