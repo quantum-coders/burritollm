@@ -22,6 +22,7 @@
 		"express": "^4.19.2",
 		"faker": "^6.6.6",
 		"http-errors": "^2.0.0",
+		"jsonwebtoken": "^9.0.2",
 		"node-fetch": "^3.3.2",
 		"officegen": "^0.6.5",
 		"openai-chat-tokens": "^0.2.8",

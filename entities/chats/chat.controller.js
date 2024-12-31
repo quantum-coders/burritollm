@@ -18,6 +18,10 @@ class ChatController extends PrimateController {
 	 */
 	static async getTokensUsage(req, res, next) {
 		const uidChat = req.params.uid;
+		console.log('=======================================');
+		console.log('== getTokensUsage INVOCADO            ==');
+		console.log('=======================================');
+		console.log('UID Chat:', uidChat);
 
 		try {
 			const chat = await prisma.chat.findUnique({
@@ -32,30 +36,70 @@ class ChatController extends PrimateController {
 			});
 
 			if (!chat) {
+				console.log('Chat no encontrado para el UID:', uidChat);
 				return res.respond({
 					status: 404,
 					message: 'Chat not found',
 				});
 			}
 
-			const totalCost = chat.messages.reduce((acc, message) => {
-				return acc + message.modelUsages.reduce((msgAcc, usage) => msgAcc + parseFloat(usage.cost), 0);
-			}, 0);
+			console.log('Chat encontrado -> ID:', chat.id, 'UID:', chat.uid);
+			console.log('Cantidad de mensajes en el chat:', chat.messages.length);
 
-			const tokensUsed = chat.messages.reduce((acc, message) => {
-				return acc + message.modelUsages.reduce((msgAcc, usage) => msgAcc + parseFloat(usage.tokensUsed), 0);
-			}, 0);
+			chat.messages.forEach((message, i) => {
+				console.log(`Mensaje #${i + 1} => ID: ${message.id}, tipo: ${message.type}`);
+				console.log(`  ModelUsages (${message.modelUsages.length}) ->`);
+				message.modelUsages.forEach((usage, j) => {
+					console.log(`    #${j + 1}: cost=${usage.cost}, tokensUsed=${usage.tokensUsed}, idChat=${usage.idChat}, idMessage=${usage.idMessage}`);
+				});
+			});
 
-			res.respond({
+			// Cálculo de totalCost
+			let totalCostNum = 0;
+			chat.messages.forEach(message => {
+				let messageCost = 0;
+				message.modelUsages.forEach(usage => {
+					messageCost += parseFloat(usage.cost);
+				});
+				console.log(`Costo del mensaje ID=${message.id}:`, messageCost);
+				totalCostNum += messageCost;
+			});
+
+			// Cálculo de tokensUsed
+			let tokensUsed = 0;
+			chat.messages.forEach(message => {
+				let messageTokens = 0;
+				message.modelUsages.forEach(usage => {
+					messageTokens += parseFloat(usage.tokensUsed);
+				});
+				console.log(`Tokens usados en mensaje ID=${message.id}:`, messageTokens);
+				tokensUsed += messageTokens;
+			});
+
+			console.log('=======================================');
+			console.log('Total Cost calculado (num):', totalCostNum); // <= Este es un número
+			console.log('Tokens usados calculados:', tokensUsed);
+			console.log('=======================================');
+
+			// 1) Convierto a string con 8 decimales
+			const totalCostStr = totalCostNum.toFixed(8);
+
+			// 2) Muestro en logs el string (ya sin notación científica)
+			console.log('Total Cost con 8 decimales (string):', totalCostStr);
+
+			// 3) DEVUELVO el string para evitar la notación científica
+			return res.respond({
 				data: {
-					totalCost,
-					tokensUsed,
-				},
+					totalCost: totalCostStr, // <-- Lo mandas como STRING
+					tokensUsed
+				}
 			});
 		} catch (error) {
-			next(error); // Pass the error to your error handling middleware
+			console.error('Error en getTokensUsage:', error);
+			next(error);
 		}
 	}
+
 
 	/**
 	 * Generates a name for a chat based on its messages.

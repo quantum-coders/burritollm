@@ -212,7 +212,7 @@ class AIService {
 		const auth = AIService.solveProviderAuth(providerData.provider);
 
 		// Ajustar el contenido utilizando adjustContent
-		const adjustedContent = AIService.adjustContent(
+		const adjustedContent = await AIService.adjustContent(
 			systemMessage,
 			history,
 			prompt,
@@ -316,8 +316,10 @@ class AIService {
 		const model = await prisma.aIModel.findUnique({
 			where: {id: parseInt(modelId)},
 		});
+		console.log("Search Query ModelId: ", modelId);
+		console.log("Modelo: ", model);
+		if (!model || !model.modelType.includes('text')) {
 
-		if (!model || model.modelType !== 'chat') {
 			console.error('Modelo no encontrado o no es de tipo chat:', modelId);
 			return '';
 		}
@@ -333,9 +335,17 @@ class AIService {
 		];
 
 		try {
+			// Ajustar el contenido utilizando adjustContent
+			const adjustedContent = await AIService.adjustContent(
+				systemPrompt,
+				messages,
+				'',
+				model.contextLength // Usar contextWindow del modelo
+			);
+
 			const data = {
 				model: model.openrouterId, // Usar el openrouterId del modelo
-				messages,
+				messages: adjustedContent.history, // Usar el historial ajustado
 				temperature: 0.7,
 				max_tokens: 60,
 				top_p: 1,
@@ -343,10 +353,12 @@ class AIService {
 				presence_penalty: 0,
 				stream: false,
 			};
-
-			const response = await axios.post(process.env.OPENROUTER_BASE_URL + '/chat/completions', data, {
+			console.log("Wghat is the data: ", data);
+			console.log("Open router key: ", process.env.OPEN_ROUTER_KEY);
+			const providerUrl = this.solveProviderUrl('openrouter');
+			const response = await axios.post(providerUrl, data, {
 				headers: {
-					'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+					'Authorization': `Bearer ${process.env.OPEN_ROUTER_KEY}`,
 					'Content-Type': 'application/json',
 				},
 			});
@@ -364,23 +376,25 @@ class AIService {
 	}
 
 	// Modificar RAGSearch para usar modelos de la BD
-	static async RAGSearch(query, searchType = 'normal') {
-		try {
-			const response = await axios.post(`${process.env.RAG_BASE_URL}`, {
-				query,
-				searchType,
-			});
-
-			if (response.status === 200 && response.data) {
-				return response.data;
-			} else {
-				console.error('Error en la respuesta de RAGSearch:', response);
-				return {context: ''};
-			}
-		} catch (error) {
-			console.error('Error en RAGSearch:', error);
-			return {context: ''};
+	static async RAGSearch(query, type = 'normal') {
+		let numResults = 10;
+		if (type === 'deep') {
+			numResults = 30;
 		}
+		const response = await ExaService.search(query, {
+			type: 'neural',
+			useAutoprompt: true,
+			numResults: 10,
+			contents: {
+				text: true,
+			},
+		});
+
+		let textConcatenated = '';
+		for (const result of response.results) {
+			textConcatenated += result.text + ' ';
+		}
+		return {sources: response, context: textConcatenated};
 	}
 
 	// Función para estimar tokens

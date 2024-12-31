@@ -1,5 +1,6 @@
 // controllers/ai.models.controller.js
 import {prisma} from "@thewebchimp/primate";
+import jwt from 'jsonwebtoken';
 import OpenRouterService from "../services/operouter.service.js";
 
 
@@ -70,6 +71,40 @@ class AIModelsController {
 		});
 	}
 
+	static async toggleSandbox(req, res) {
+		try {
+			const {id} = req.params; // <-- de la URL
+			// Buscar el modelo
+			const model = await prisma.aIModel.findUnique({
+				where: {id: parseInt(id)},
+			});
+
+			if (!model) {
+				return res.respond({message: 'Model not found'}, 404);
+			}
+
+			// Hacer toggle:
+			// Cambiar de true a false, o de false a true
+			const updatedModel = await prisma.aIModel.update({
+				where: {id: parseInt(id)},
+				data: {sandbox: !model.sandbox}
+			});
+
+			res.respond({
+				data: updatedModel,
+				message: `Model sandbox ${updatedModel.sandbox ? 'enabled' : 'disabled'} successfully`
+			});
+		} catch (error) {
+			console.error('[toggleSandbox] Error:', error);
+			res.respond({
+				status: 500,
+				error: error.message,
+				message: 'Failed to toggle sandbox'
+			});
+		}
+	}
+
+
 	static async performToggleFeatured(modelIds, payload) {
 		const {isFeatured} = payload;
 		await prisma.aIModel.updateMany({
@@ -132,27 +167,109 @@ class AIModelsController {
 
 	static async getAvailableModels(req, res) {
 		try {
-			const models = await prisma.aIModel.findMany({
-				where: {
-					isVisible: true,
-					status: 'active'
-				},
-				orderBy: [
-					{priority: 'desc'},
-					{name: 'asc'}
-				]
+			// Ver todos los headers que llegan
+			console.log('[getAvailableModels] req.headers:', req.headers);
+
+			// 1. Tomar el header Authorization con minúsculas
+			const authHeader = req.headers['authorization'];
+			console.log('[getAvailableModels] authHeader:', authHeader);
+
+			// Verificar que exista y empiece con 'Bearer '
+			if (!authHeader || !authHeader.startsWith('Bearer ')) {
+				console.log('[getAvailableModels] Falta el bearer token o es inválido');
+				return res.respond({
+					status: 401,
+					message: 'Unauthorized: missing or invalid Bearer token',
+				});
+			}
+
+			// 2. Extraer el token en sí
+			const token = authHeader.split(' ')[1];
+			console.log('[getAvailableModels] token extraído:', token);
+
+			// 3. Decodificar / verificar el JWT
+			let decoded;
+			try {
+				decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+				console.log('[getAvailableModels] Token decodificado:', decoded);
+			} catch (err) {
+				console.error('[getAvailableModels] Error al verificar token:', err);
+				return res.respond({
+					status: 401,
+					message: 'Unauthorized: invalid token',
+				});
+			}
+
+			// 4. Revisar la estructura del payload (asumiendo payload > user id en decoded.payload.id)
+			//    Ajusta esto a como hayas definido el token en tu server.
+			if (!decoded.payload?.id) {
+				console.log('[getAvailableModels] El token no contiene user ID en decoded.payload.id');
+				return res.respond({
+					status: 400,
+					message: 'Invalid token payload: missing user ID',
+				});
+			}
+
+			const userId = decoded.payload.id;
+			console.log('[getAvailableModels] userId extraído del token:', userId);
+
+			// 5. Buscar el usuario en la BD
+			const user = await prisma.user.findUnique({
+				where: {id: userId},
+			});
+			console.log('[getAvailableModels] user encontrado:', user);
+
+			if (!user) {
+				console.log('[getAvailableModels] user no existe en la BD');
+				return res.respond({
+					status: 404,
+					message: 'User not found',
+				});
+			}
+
+			// 6. Decidir filtro: si user.type === 'Admin' => sandbox, else => isVisible
+			let models;
+			if (user.type === 'Admin') {
+				console.log('[getAvailableModels] El usuario es Admin, usaremos sandbox:true');
+				models = await prisma.aIModel.findMany({
+					where: {
+						sandbox: true,
+						status: 'active',
+					},
+					orderBy: [
+						{priority: 'desc'},
+						{name: 'asc'},
+					],
+				});
+			} else {
+				console.log('[getAvailableModels] El usuario NO es Admin, usaremos isVisible:true');
+				models = await prisma.aIModel.findMany({
+					where: {
+						isVisible: true,
+						status: 'active',
+					},
+					orderBy: [
+						{priority: 'desc'},
+						{name: 'asc'},
+					],
+				});
+			}
+
+			console.log('[getAvailableModels] Models a devolver:', models);
+
+			// 7. Responder
+			return res.respond({
+				data: models,
+				message: "Models fetched successfully",
 			});
 
-			res.respond({
-				data: models,
-				message: "Models fetched successfully"
-			});
 		} catch (error) {
-			console.error('[getAvailableModels] Error:', error);
-			res.respond({
+			console.error('[getAvailableModels] Error general:', error);
+			return res.respond({
+				status: 500,
 				error: error.message,
-				message: "Failed to fetch models"
-			}, 500);
+				message: "Failed to fetch models",
+			});
 		}
 	}
 

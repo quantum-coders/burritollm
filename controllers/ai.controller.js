@@ -372,7 +372,7 @@ class AIController {
 
 			response.data.on('data', (chunk) => {
 				const chunkString = chunk.toString();
-				console.log("Chunk recibido:", chunkString);
+				// console.log("Chunk recibido:", chunkString);
 				buffer += chunkString;
 				let lines = buffer.split('\n');
 				buffer = lines.pop();
@@ -392,15 +392,15 @@ class AIController {
 
 						try {
 							const parsedData = JSON.parse(line.slice(5));
-							console.log("Datos parseados del chunk:", parsedData);
+							// console.log("Datos parseados del chunk:", parsedData);
 
 							if (parsedData.choices && parsedData.choices[0].delta && parsedData.choices[0].delta.content) {
 								assistantResponse += parsedData.choices[0].delta.content;
-								console.log("Respuesta del asistente actualizada:", assistantResponse);
+								// console.log("Respuesta del asistente actualizada:", assistantResponse);
 							}
 							if (parsedData.usage && parsedData.usage.total_tokens) {
 								totalTokensUsed = parsedData.usage.total_tokens;
-								console.log("Tokens totales usados:", totalTokensUsed);
+								// console.log("Tokens totales usados:", totalTokensUsed);
 							}
 						} catch (e) {
 							console.error('Error al parsear JSON del chunk:', e);

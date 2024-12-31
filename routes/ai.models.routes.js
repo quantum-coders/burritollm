@@ -14,6 +14,8 @@ router.get('/models', auth, isAdmin, AIModelsController.getAllModels); // Obtien
 router.patch('/models/:id/visibility', auth, isAdmin, AIModelsController.toggleModelVisibility); // Toggle visibilidad
 router.patch('/models/:id/featured', auth, isAdmin, AIModelsController.toggleModelFeatured); // Toggle featured status
 router.patch('/models/:id/priority', auth, isAdmin, AIModelsController.updateModelPriority); // Actualizar prioridad
+// crea uno igaul pero /sandbox
+router.patch('/models/:id/sandbox', auth, isAdmin, AIModelsController.toggleSandbox); // Toggle sandbox status
 router.put('/models/:id', auth, isAdmin, AIModelsController.updateModel); // Actualizar información del modelo
 router.post('/models/sync', auth, isAdmin, AIModelsController.syncWithOpenRouter); // Sincronizar con OpenRouter
 router.patch('/models/bulk-action', auth, isAdmin, AIModelsController.bulkAction);
