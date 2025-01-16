@@ -274,7 +274,7 @@ class UserController extends PrimateController {
 					balance = await prisma.userBalance.create({
 						data: {
 							idUser: user.id,
-							balance: 0.5,
+							balance: 0.1,
 						},
 					});
 				}
