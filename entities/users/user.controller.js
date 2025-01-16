@@ -128,8 +128,16 @@ class UserController extends PrimateController {
 		try {
 			const idUser = req.user.payload.id;
 
+			const skip = parseInt(req.query.skip ?? '0');
+			const take = parseInt(req.query.take ?? '12');
+
 			const chats = await prisma.chat.findMany({
 				where: {idUser},
+				skip,
+				take,
+				orderBy: {
+					modified: 'desc', // Ordenamos los chats por su última modificación directamente
+				},
 				select: {
 					id: true,
 					name: true,
@@ -139,6 +147,7 @@ class UserController extends PrimateController {
 					system: true,
 					status: true,
 					created: true,
+					modified: true, // La última modificación a nivel de chat
 					user: {
 						select: {
 							wallet: true,
@@ -146,7 +155,7 @@ class UserController extends PrimateController {
 					},
 					messages: {
 						orderBy: {
-							modified: 'desc',
+							modified: 'desc', // Seleccionamos el mensaje más reciente
 						},
 						take: 1,
 						select: {
@@ -160,26 +169,27 @@ class UserController extends PrimateController {
 					},
 				},
 			});
-			// if there is only one chat it is an object so convert to array
-			const chatsArray = Array.isArray(chats) ? chats : [chats];
-			const formattedChats = chatsArray.map(chat => ({
+
+			const formattedChats = chats.map(chat => ({
 				...chat,
-				userName: chat.user.name,
-				modified: chat.messages[0]?.modified || chat.modified,
-				user: undefined,
-				messages: undefined,
+				modified: chat.messages[0]?.modified || chat.modified, // Usamos el mensaje más reciente o la modificación del chat
 				wallet: chat.user.wallet,
+				user: undefined, // Eliminamos la referencia directa al usuario
+				messages: undefined, // Eliminamos los mensajes adicionales para limpiar la respuesta
 			}));
 
 			return res.respond({
 				data: formattedChats,
 				message: 'Chats found',
 			});
-
 		} catch (e) {
-			next(createError(404, e.message));
+			return res.respond({
+				status: 400,
+				message: e.message,
+			});
 		}
 	}
+
 
 	static async getImages(req, res, next) {
 		try {
@@ -341,121 +351,121 @@ class UserController extends PrimateController {
 	}
 
 	static async getChat(req, res, next) {
-    try {
-        const { uid } = req.params;
-        const idUser = req.user.payload.id;
+		try {
+			const {uid} = req.params;
+			const idUser = req.user.payload.id;
 
-        let chat = await prisma.chat.findFirst({
-            where: {
-                idUser: idUser,
-                uid: uid,
-            },
-            include: {
-                modelUsages: true,
-                messages: true,
-                selectedModel: true, // Incluir el modelo seleccionado
-                user: {
-                    select: {
-                        wallet: true,
-                    },
-                },
-                _count: {
-                    select: {
-                        messages: true,
-                    },
-                },
-            },
-        });
+			let chat = await prisma.chat.findFirst({
+				where: {
+					idUser: idUser,
+					uid: uid,
+				},
+				include: {
+					modelUsages: true,
+					messages: true,
+					selectedModel: true, // Incluir el modelo seleccionado
+					user: {
+						select: {
+							wallet: true,
+						},
+					},
+					_count: {
+						select: {
+							messages: true,
+						},
+					},
+				},
+			});
 
-        if (!chat) {
-            return res.respond({
-                status: 404,
-                message: 'Chat not found',
-            });
-        }
+			if (!chat) {
+				return res.respond({
+					status: 404,
+					message: 'Chat not found',
+				});
+			}
 
-        // Si el chat no tiene un modelo seleccionado, asignar el modelo por defecto
-        if (!chat.selectedModel) {
-            const defaultModel = await prisma.aIModel.findFirst({
-                where: { openrouterId: 'neversleep/llama-3-lumimaid-70b' },
-            });
+			// Si el chat no tiene un modelo seleccionado, asignar el modelo por defecto
+			if (!chat.selectedModel) {
+				const defaultModel = await prisma.aIModel.findFirst({
+					where: {openrouterId: 'neversleep/llama-3-lumimaid-70b'},
+				});
 
-            if (defaultModel) {
-                chat = await prisma.chat.update({
-                    where: { id: chat.id },
-                    data: { idModel: defaultModel.id },
-                    include: {
-                        modelUsages: true,
-                        messages: true,
-                        selectedModel: true,
-                        user: {
-                            select: {
-                                wallet: true,
-                            },
-                        },
-                        _count: {
-                            select: {
-                                messages: true,
-                            },
-                        },
-                    },
-                });
-            }
-        }
+				if (defaultModel) {
+					chat = await prisma.chat.update({
+						where: {id: chat.id},
+						data: {idModel: defaultModel.id},
+						include: {
+							modelUsages: true,
+							messages: true,
+							selectedModel: true,
+							user: {
+								select: {
+									wallet: true,
+								},
+							},
+							_count: {
+								select: {
+									messages: true,
+								},
+							},
+						},
+					});
+				}
+			}
 
-        // if metas is empty define {}
-        if (!chat.metas) {
-            chat.metas = {};
-        }
+			// if metas is empty define {}
+			if (!chat.metas) {
+				chat.metas = {};
+			}
 
-        const messageStatistics = {
-            count: chat._count.messages,
-            created: chat.created,
-            modified: chat.messages.length > 0
-                ? chat.messages.reduce((latest, message) =>
-                    message.modified > latest ? message.modified : latest,
-                    chat.created,
-                )
-                : chat.created,
-        };
+			const messageStatistics = {
+				count: chat._count.messages,
+				created: chat.created,
+				modified: chat.messages.length > 0
+					? chat.messages.reduce((latest, message) =>
+							message.modified > latest ? message.modified : latest,
+						chat.created,
+					)
+					: chat.created,
+			};
 
-        let totalCost = 0;
-        for (const usage of chat.modelUsages) {
-            const tokens = parseFloat(usage.cost);
-            totalCost += tokens;
-        }
+			let totalCost = 0;
+			for (const usage of chat.modelUsages) {
+				const tokens = parseFloat(usage.cost);
+				totalCost += tokens;
+			}
 
-        const tokensUsed = [];
-        for (const message of chat.messages) {
-            let msgTotal = 0;
-            if (message.modelUsages && message.modelUsages.length > 0) {
-                for (const usage of message.modelUsages) {
-                    msgTotal += parseFloat(usage.tokensUsed);
-                }
-            }
-            tokensUsed.push(msgTotal);
-        }
+			const tokensUsed = [];
+			for (const message of chat.messages) {
+				let msgTotal = 0;
+				if (message.modelUsages && message.modelUsages.length > 0) {
+					for (const usage of message.modelUsages) {
+						msgTotal += parseFloat(usage.tokensUsed);
+					}
+				}
+				tokensUsed.push(msgTotal);
+			}
 
-        const formattedChat = {
-            ...chat,
-            messageStatistics,
-            _count: undefined,
-            totalCost,
-            tokensUsed,
-        };
+			const formattedChat = {
+				...chat,
+				messageStatistics,
+				_count: undefined,
+				totalCost,
+				tokensUsed,
+			};
 
-        return res.respond({
-            data: formattedChat,
-            message: 'Chat found',
-        });
+			return res.respond({
+				data: formattedChat,
+				message: 'Chat found',
+			});
 
-    } catch (e) {
-        res.respond({
-            status: 400,
-            message: e.message,
-        })
-    }
-}
+		} catch (e) {
+			res.respond({
+				status: 400,
+				message: e.message,
+			})
+		}
+	}
 
 	//updateChatPatch
 	static async updateChatPatch(req, res, next) {
