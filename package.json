@@ -22,6 +22,7 @@
 		"ethers": "5.7.2",
 		"express": "^4.19.2",
 		"faker": "^6.6.6",
+		"gpt-3-encoder": "^1.1.4",
 		"http-errors": "^2.0.0",
 		"jsonwebtoken": "^9.0.2",
 		"node-fetch": "^3.3.2",

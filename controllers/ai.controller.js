@@ -3,13 +3,22 @@ import {prisma} from '@thewebchimp/primate';
 import AIService from '../services/ai.service.js';
 import ChatService from '../entities/chats/chat.service.js';
 import MessageService from "../services/message.service.js";
+import GPT3Tokenizer from 'gpt-3-encoder';
 import axios from "axios";
+
+const tokenizer = GPT3Tokenizer;
 
 // En un módulo accesible por tus controladores
 import ongoingRequests from "../assets/data/ongoingRequests.js";
 
 class AIController {
 	// Endpoint de cancelación
+
+	static countTokens(text) {
+		if (!text) return 0;
+		return tokenizer.encode(text).length;
+	}
+
 	static async cancelMessage(req, res) {
 
 		const {idRequest} = req.body;
@@ -51,7 +60,7 @@ class AIController {
 		console.log("==== Inicio de la función sendMessage ====");
 		const body = req.body;
 		console.log("Cuerpo de la solicitud:", body);
-
+		let totalPromptTokensApprox = 0;
 		const idChat = body.idChat;
 		const uidMessage = body.uidMessage;
 		const assistantUid = body.assistantUidMessage;
@@ -209,6 +218,9 @@ class AIController {
 		}
 
 		console.log("Obteniendo información del modelo desde la base de datos...");
+
+		totalPromptTokensApprox += AIController.countTokens(system);
+
 		const modelData = await prisma.aIModel.findFirst({where: {openrouterId: model}});
 		console.log("Información del modelo:", modelData);
 		const idModel = modelData.id;
@@ -226,39 +238,12 @@ class AIController {
 			history = [];
 		}
 		console.log("Historial del chat después del mapeo:", history);
-
-		let webSearchContext = '';
-		console.info('Iniciando proceso de búsqueda web');
-
-		const webSearchResponse = await AIService.validateChatWebSearchConfig(idChat);
-		console.info('Respuesta de validación de configuración de búsqueda web:', webSearchResponse);
-
-		if (webSearchResponse.webSearch) {
-			console.info('Búsqueda web habilitada, creando consulta de búsqueda');
-			const searchQuery = await AIService.createSearchQuery(history, prompt, idModel);
-			console.info('Consulta de búsqueda creada:', searchQuery);
-
-			if (searchQuery !== '') {
-				console.info('Realizando búsqueda RAG con la consulta');
-				webSearchContext = await AIService.RAGSearch(searchQuery, webSearchResponse.chat?.metas?.webSearch.type);
-				console.info('Resultado de búsqueda RAG:', webSearchContext);
-
-				webSearchContext = webSearchContext.context;
-				console.info('Contexto de búsqueda web extraído:', webSearchContext);
-			} else {
-				console.info('La consulta de búsqueda está vacía, no se realizará búsqueda RAG');
-			}
-		} else {
-			console.info('Búsqueda web no habilitada para este chat');
+		for (const msg of history) {
+			totalPromptTokensApprox += AIController.countTokens(msg.content);
 		}
-
-		console.info('Proceso de búsqueda web completado');
-
-		if (webSearchContext !== '') {
-			system += 'In order to respond to the user, use also this information as context: ' + webSearchContext;
-			console.log("Sistema actualizado con contexto de búsqueda web:", system);
-		}
-
+		totalPromptTokensApprox += AIController.countTokens(prompt);
+		let partialAssistantResponse = '';
+		let partialAssistantTokensApprox = 0;
 		try {
 			console.log("Almacenando mensaje del usuario en la base de datos...");
 			const newMessage = await MessageService.storeMessage({
@@ -348,6 +333,8 @@ class AIController {
 					lastChunks,
 					idModel,
 					res,
+					localPromptTokens: totalPromptTokensApprox,
+					localAssistantTokens: partialAssistantTokensApprox
 				});
 
 				if (!res.writableEnded) {
@@ -395,8 +382,10 @@ class AIController {
 							// console.log("Datos parseados del chunk:", parsedData);
 
 							if (parsedData.choices && parsedData.choices[0].delta && parsedData.choices[0].delta.content) {
-								assistantResponse += parsedData.choices[0].delta.content;
-								// console.log("Respuesta del asistente actualizada:", assistantResponse);
+								const deltaContent = parsedData.choices[0].delta.content;
+								assistantResponse += deltaContent;
+								partialAssistantResponse += deltaContent;
+								partialAssistantTokensApprox += AIController.countTokens(deltaContent);
 							}
 							if (parsedData.usage && parsedData.usage.total_tokens) {
 								totalTokensUsed = parsedData.usage.total_tokens;
@@ -461,13 +450,14 @@ class AIController {
 		                                    idChat,
 		                                    idUser,
 		                                    assistantResponse,
-		                                    // OJO: unificamos el nombre a "assistantUid" (antes se llamaba "assitantUid")
-		                                    assistantUid,
+		                                    assistantUid,   // (ya renombrado)
 		                                    newMessage,
 		                                    totalTokensUsed,
 		                                    lastChunks,
 		                                    idModel,
 		                                    res,
+		                                    localPromptTokens,     // <- estos dos vienen del cleanup
+		                                    localAssistantTokens   // <- contadores aproximados
 	                                    }) {
 		try {
 			// 1. Guardar el mensaje del asistente
@@ -477,7 +467,7 @@ class AIController {
 					idUser,
 					content: assistantResponse,
 					type: 'assistant',
-					uid: assistantUid, // corregido
+					uid: assistantUid,
 					responseTo: newMessage.id,
 				});
 			}
@@ -486,6 +476,7 @@ class AIController {
 			let promptTokensUsed = 0;
 			let completionTokensUsed = 0;
 
+			// --(A) Intentar parsear "usage" oficial del stream--
 			if (totalTokensUsed === 0) {
 				const combinedLastChunks = lastChunks.join('');
 				// Buscar la subsección "usage": { ... } en el JSON
@@ -508,11 +499,23 @@ class AIController {
 				}
 			}
 
-			// Fallback: si no tenemos prompt/completion, repartimos todo a prompt
-			if (promptTokensUsed === 0 && completionTokensUsed === 0) {
+			// --(B) Si sigue en 0, hacemos fallback a conteo local--
+			if (totalTokensUsed === 0) {
+				console.log('No se recibió `usage` oficial, usando conteo local...');
+				totalTokensUsed = (localPromptTokens || 0) + (localAssistantTokens || 0);
+				promptTokensUsed = localPromptTokens || 0;
+				completionTokensUsed = localAssistantTokens || 0;
+			}
+
+			// --(C) Tu lógica original: si no tenemos prompt/completion y sí tenemos totalTokensUsed,
+			//       reasignar todo a prompt.
+			//       OJO: solo lo aplicamos si no vinimos del fallback local (que ya separó prompt/assistant).
+			//       Pero si quieres conservar EXACTO el comportamiento anterior, lo dejas así:
+			if (promptTokensUsed === 0 && completionTokensUsed === 0 && totalTokensUsed > 0) {
 				promptTokensUsed = totalTokensUsed;
 			}
 
+			// --(D) Si después de todo totalTokensUsed > 0, calculamos costo
 			if (totalTokensUsed > 0) {
 				try {
 					const costs = await AIController.getModelCosts(idModel);
@@ -545,7 +548,7 @@ class AIController {
 					console.error('Error al procesar costos:', error);
 				}
 			} else {
-				console.error('No se obtuvo token usage en el stream');
+				console.error('No se obtuvo token usage en el stream (ni oficial ni local)');
 			}
 		} catch (error) {
 			console.error('Error en handleStreamEndOrClose:', error);
