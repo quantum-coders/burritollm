@@ -79,15 +79,19 @@ model Message {
 }
 
 model ModelUsage {
-  id            Int      @id @default(autoincrement())
-  idUser        Int      @map("id_user")
-  idModel       Int      @map("id_model")
-  idChat        Int      @map("id_chat")
-  idMessage     Int      @map("id_message")
-  tokensUsed    Int      @map("tokens_used")
-  cost          Decimal  @db.Decimal(10, 8)
-  balanceBefore Decimal  @default(0) @map("balance_before") @db.Decimal(10, 8)
-  created       DateTime @default(now())
+  id               Int      @id @default(autoincrement())
+  idUser           Int      @map("id_user")
+  idModel          Int      @map("id_model")
+  idChat           Int      @map("id_chat")
+  idMessage        Int      @map("id_message")
+  tokensUsed       Int      @map("tokens_used")
+  promptTokens     Int      @default(0) @map("prompt_tokens")
+  completionTokens Int      @default(0) @map("completion_tokens")
+  promptCost       Decimal  @default(0) @map("prompt_cost") @db.Decimal(10, 8)
+  completionCost   Decimal  @default(0) @map("completion_cost") @db.Decimal(10, 8)
+  cost             Decimal  @db.Decimal(10, 8)
+  balanceBefore    Decimal  @default(0) @map("balance_before") @db.Decimal(10, 8)
+  created          DateTime @default(now())
 
   user    User    @relation(fields: [idUser], references: [id])
   aiModel AIModel @relation(fields: [idModel], references: [id])

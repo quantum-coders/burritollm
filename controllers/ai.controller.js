@@ -461,29 +461,34 @@ class AIController {
 		                                    idChat,
 		                                    idUser,
 		                                    assistantResponse,
-		                                    assitantUid,
+		                                    // OJO: unificamos el nombre a "assistantUid" (antes se llamaba "assitantUid")
+		                                    assistantUid,
 		                                    newMessage,
 		                                    totalTokensUsed,
 		                                    lastChunks,
 		                                    idModel,
-		                                    res
+		                                    res,
 	                                    }) {
 		try {
-			// Guardar el mensaje del asistente
+			// 1. Guardar el mensaje del asistente
 			if (assistantResponse) {
 				await MessageService.storeMessage({
 					idChat,
 					idUser,
 					content: assistantResponse,
 					type: 'assistant',
-					uid: assitantUid,
+					uid: assistantUid, // corregido
 					responseTo: newMessage.id,
 				});
 			}
 
-			// Buscar los últimos tokens si no fueron procesados durante la transmisión
+			// 2. Intentar extraer uso de tokens (prompt/completion) de los últimos chunks
+			let promptTokensUsed = 0;
+			let completionTokensUsed = 0;
+
 			if (totalTokensUsed === 0) {
 				const combinedLastChunks = lastChunks.join('');
+				// Buscar la subsección "usage": { ... } en el JSON
 				const usageMatch = combinedLastChunks.match(/"usage":\s*({[^}]+})/);
 				if (usageMatch) {
 					try {
@@ -491,20 +496,45 @@ class AIController {
 						if (usageData.total_tokens) {
 							totalTokensUsed = usageData.total_tokens;
 						}
+						if (usageData.prompt_tokens) {
+							promptTokensUsed = usageData.prompt_tokens;
+						}
+						if (usageData.completion_tokens) {
+							completionTokensUsed = usageData.completion_tokens;
+						}
 					} catch (error) {
-						console.error('Error parsing usage data from last chunks:', error);
+						console.error('Error al parsear usage del chunk final:', error);
 					}
 				}
 			}
 
-			// Procesar el costo si se obtuvo el uso de tokens
+			// Fallback: si no tenemos prompt/completion, repartimos todo a prompt
+			if (promptTokensUsed === 0 && completionTokensUsed === 0) {
+				promptTokensUsed = totalTokensUsed;
+			}
+
 			if (totalTokensUsed > 0) {
 				try {
 					const costs = await AIController.getModelCosts(idModel);
 					if (costs && !isNaN(costs.inputCost) && !isNaN(costs.outputCost)) {
-						const totalCost = (totalTokensUsed / 1_000_000) * (parseFloat(costs.inputCost) + parseFloat(costs.outputCost));
+						// Multiplicamos tokens del prompt por inputCost
+						const promptCost = promptTokensUsed * parseFloat(costs.inputCost);
+						// Multiplicamos tokens de completion por outputCost
+						const completionCost = completionTokensUsed * parseFloat(costs.outputCost);
+						const totalCost = promptCost + completionCost;
+
 						if (!isNaN(totalCost)) {
-							await AIController.updateUserData(idUser, idModel, idChat, totalTokensUsed, totalCost);
+							await AIController.updateUserData(
+								idUser,
+								idModel,
+								idChat,
+								totalTokensUsed,
+								promptTokensUsed,
+								completionTokensUsed,
+								promptCost,
+								completionCost,
+								totalCost
+							);
 						} else {
 							console.error('Calculated totalCost is NaN');
 						}
@@ -512,17 +542,21 @@ class AIController {
 						console.error('Invalid cost data:', costs);
 					}
 				} catch (error) {
-					console.error('Error processing costs:', error);
+					console.error('Error al procesar costos:', error);
 				}
 			} else {
-				console.error('Failed to obtain token usage');
+				console.error('No se obtuvo token usage en el stream');
 			}
 		} catch (error) {
-			console.error('Error during stream end/close handling:', error);
+			console.error('Error en handleStreamEndOrClose:', error);
 		} finally {
-			res.end(); // Cerrar la respuesta al cliente
+			// Asegura el cierre de la respuesta
+			if (!res.writableEnded) {
+				res.end();
+			}
 		}
 	}
+
 
 	static async createImage(req, res) {
 		try {
@@ -595,74 +629,78 @@ class AIController {
 	 * @param {string} idUser - The unique identifier of the user.
 	 * @param {string} idModel - The unique identifier of the AI model used.
 	 * @param {string} idChat - The unique identifier of the chat in which the model was used.
-	 * @param {number} tokensUsed - The number of tokens used during the model's execution.
+	 * @param totalTokensUsed
+	 * @param promptTokensUsed
+	 * @param completionTokensUsed
+	 * @param promptCost
+	 * @param completionCost
 	 * @param {number} totalCost - The total cost incurred for the usage of the model.
 	 * @returns {Promise<void>} - A promise that resolves when the user's data has been updated.
 	 * @throws {Error} - Logs and rethrows any error encountered during the process.
 	 */
-	static async updateUserData(idUser, idModel, idChat, tokensUsed, totalCost) {
+	static async updateUserData(
+		idUser,
+		idModel,
+		idChat,
+		totalTokensUsed,
+		promptTokensUsed,
+		completionTokensUsed,
+		promptCost,
+		completionCost,
+		totalCost
+	) {
 		try {
 			const existingBalance = await prisma.userBalance.findUnique({
 				where: {idUser},
 			});
-			const lastMessageFromChat = await prisma.message.findFirst({
-				where: {
-					idChat: idChat,
-				},
-				orderBy: {
-					created: 'desc',
-				},
+
+			// Tomar el último mensaje (para idMessage)
+			const lastMessage = await prisma.message.findFirst({
+				where: {idChat},
+				orderBy: {created: 'desc'},
 			});
+
 			await prisma.modelUsage.create({
 				data: {
-					balanceBefore: existingBalance ? existingBalance.balance : 0,
-					tokensUsed,
+					idUser,
+					idModel,
+					idChat,
+					idMessage: lastMessage?.id,
+					tokensUsed: totalTokensUsed,
+					promptTokens: promptTokensUsed,
+					completionTokens: completionTokensUsed,
+					promptCost,
+					completionCost,
 					cost: totalCost,
-					user: {
-						connect: {
-							id: idUser,
-						},
-					},
-					aiModel: {
-						connect: {
-							id: idModel,
-						},
-					},
-					chat: {
-						connect: {
-							id: idChat,
-						},
-					},
-					message: {
-						connect: {
-							id: lastMessageFromChat.id,
-						},
-					},
+					balanceBefore: existingBalance ? existingBalance.balance : 0,
 				},
 			});
+
+			// Actualizar el balance
+			const newBalance = existingBalance
+				? existingBalance.balance - totalCost
+				: -totalCost;
+
 			if (existingBalance) {
-				// Actualizar el balance existente restando el totalCost
-				const newBalance = existingBalance.balance - totalCost;
 				await prisma.userBalance.update({
 					where: {idUser},
-					data: {
-						balance: newBalance,
-					},
+					data: {balance: newBalance},
 				});
 			} else {
-				// Crear un nuevo registro de balance con el totalCost negativo
 				await prisma.userBalance.create({
 					data: {
 						idUser,
-						balance: -totalCost,
+						balance: newBalance,
 					},
 				});
 			}
+
 		} catch (error) {
 			console.error('Error updating user data:', error);
 			throw error;
 		}
 	}
+
 
 	/**
 	 * Checks if the user has enough balances to proceed with a transaction.
