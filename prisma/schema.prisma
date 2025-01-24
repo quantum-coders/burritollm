@@ -119,7 +119,7 @@ model Attachment {
 
 model AIModel {
   id                   Int      @id @default(autoincrement())
-  name                 String   @unique
+  name                 String
   description          String?  @db.Text
   inputCost            Decimal  @map("input_cost") @db.Decimal(10, 8)
   outputCost           Decimal  @map("output_cost") @db.Decimal(10, 8)
