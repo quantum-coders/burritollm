@@ -285,6 +285,11 @@ class UserController extends PrimateController {
 				user.balance = balance ? balance.balance : 0.00;
 				// parse float
 				user.balance = parseFloat(user.balance);
+				const userCryptoBalances = await UserService.getUserCryptoBalances(user.wallet);
+				user.balances = {
+					...userCryptoBalances,
+					usd: user.balance,
+				}
 				res.respond({
 					data: user,
 					message: 'User found',
