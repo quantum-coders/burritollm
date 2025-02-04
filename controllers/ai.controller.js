@@ -201,7 +201,7 @@ class AIController {
 		});
 
 		let chatObject = await prisma.chat.findUnique({
-			where: { id: idChat },
+			where: {id: idChat},
 		});
 		if (!system && !chatObject.system) {
 
@@ -362,6 +362,7 @@ class AIController {
 			let totalTokensUsed = 0;
 			let lastChunks = [];
 			let assistantResponse = '';
+			let reasoning = '';
 			let buffer = '';
 
 			response.data.on('data', (chunk) => {
@@ -386,18 +387,31 @@ class AIController {
 
 						try {
 							const parsedData = JSON.parse(line.slice(5));
-							// console.log("Datos parseados del chunk:", parsedData);
-
+							console.log("Datos parseados del chunk:", parsedData);
+							console.log("Datos parseados del chunk:", parsedData.choices[0].delta);
 							if (parsedData.choices && parsedData.choices[0].delta && parsedData.choices[0].delta.content) {
 								const deltaContent = parsedData.choices[0].delta.content;
+
+								if(parsedData.choices[0].delta?.reasoning){
+									reasoning = parsedData.choices[0].delta.reasoning;
+								}
+
 								assistantResponse += deltaContent;
 								partialAssistantResponse += deltaContent;
 								partialAssistantTokensApprox += AIController.countTokens(deltaContent);
+								console.log('Contenido parcial recibido:', deltaContent);
+								// console.log('Respuesta acumulada:', assistantResponse);
+								///
 							}
+
+							// check for the key reasoning
+
+
 							if (parsedData.usage && parsedData.usage.total_tokens) {
 								totalTokensUsed = parsedData.usage.total_tokens;
 								// console.log("Tokens totales usados:", totalTokensUsed);
 							}
+
 						} catch (e) {
 							console.error('Error al parsear JSON del chunk:', e);
 						}
@@ -464,7 +478,8 @@ class AIController {
 		                                    idModel,
 		                                    res,
 		                                    localPromptTokens,     // <- estos dos vienen del cleanup
-		                                    localAssistantTokens   // <- contadores aproximados
+		                                    localAssistantTokens,  // <- contadores aproximados,
+											reasoning,
 	                                    }) {
 		try {
 			// 1. Guardar el mensaje del asistente
@@ -474,6 +489,7 @@ class AIController {
 					idUser,
 					content: assistantResponse,
 					type: 'assistant',
+					reasoning: reasoning,
 					uid: assistantUid,
 					responseTo: newMessage.id,
 				});

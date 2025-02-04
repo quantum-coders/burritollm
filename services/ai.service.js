@@ -22,7 +22,13 @@ class AIService {
 	static async sendMessage(data, provider, signal) {
 		const bearerToken = AIService.solveProviderAuth(provider);
 		const url = AIService.solveProviderUrl(provider);
-
+		/// agrega un if
+		if (data.model === 'deepseek/deepseek-r1') {
+			// add include_reasoning in true
+			data.include_reasoning = true;
+			data.tranforms = ["middle-out"]
+			data.plugins = []
+		}
 		/// console info the payload of the request
 		console.info('Request payload:', data);
 		return await axios.post(url, data, {

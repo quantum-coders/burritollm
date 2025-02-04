@@ -63,6 +63,7 @@ model Message {
   idChat     Int      @map("id_chat")
   idUser     Int      @map("id_user")
   content    String   @db.LongText
+  reasoning  String?  @db.Text
   type       String   @default("user") @map("message_type")
   idRequest  String?  @unique @default(cuid()) @map("id_request")
   responseTo Int?     @map("response_to")
