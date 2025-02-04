@@ -341,7 +341,8 @@ class AIController {
 					idModel,
 					res,
 					localPromptTokens: totalPromptTokensApprox,
-					localAssistantTokens: partialAssistantTokensApprox
+					localAssistantTokens: partialAssistantTokensApprox,
+					reasoning
 				});
 
 				if (!res.writableEnded) {
@@ -389,12 +390,12 @@ class AIController {
 							const parsedData = JSON.parse(line.slice(5));
 							console.log("Datos parseados del chunk:", parsedData);
 							console.log("Datos parseados del chunk:", parsedData.choices[0].delta);
+							if (parsedData.choices[0].delta?.reasoning) {
+								reasoning += parsedData.choices[0].delta.reasoning;
+							}
 							if (parsedData.choices && parsedData.choices[0].delta && parsedData.choices[0].delta.content) {
 								const deltaContent = parsedData.choices[0].delta.content;
 
-								if(parsedData.choices[0].delta?.reasoning){
-									reasoning = parsedData.choices[0].delta.reasoning;
-								}
 
 								assistantResponse += deltaContent;
 								partialAssistantResponse += deltaContent;
@@ -479,7 +480,7 @@ class AIController {
 		                                    res,
 		                                    localPromptTokens,     // <- estos dos vienen del cleanup
 		                                    localAssistantTokens,  // <- contadores aproximados,
-											reasoning,
+		                                    reasoning,
 	                                    }) {
 		try {
 			// 1. Guardar el mensaje del asistente

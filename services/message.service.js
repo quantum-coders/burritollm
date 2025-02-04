@@ -19,14 +19,18 @@ class MessageService {
         content,
         uid,
         type,
-        responseTo
+        responseTo,
+        reasoning
     }) {
         try {
             const messageData = {
                 idChat,
                 idUser,
                 content,
-                uid
+                uid,
+                reasoning,
+                type,
+                responseTo
             };
 
             // Only add optional fields if they are provided
